@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use bioprep::breakend::vcf_to_structural_variants;
 use clap::{Parser, Subcommand, ValueEnum};
 use std::{
@@ -87,28 +87,14 @@ fn main() -> Result<()> {
                 SvOutputTypes::BreakendTsv => todo!(),
             };
         }
-        Commands::Vcf { vcf, from, to } => {
+        Commands::Vcf {
+            vcf: _,
+            from: _,
+            to: _,
+        } => {
             todo!("No implementation available for converting vcf to anything");
         }
     };
-
-    // if !cli.vcf.exists() {
-    //     anyhow::bail!("Failed to find VCF file [{}]", cli.vcf.display())
-    // }
-    //
-    // // CONFIG
-    // // Read svVCF
-    // let vcf = cli
-    //     .vcf
-    //     .to_str()
-    //     .context("Failed to convert vcf path to str")?;
-    //
-    // // Define VAF field based on input tool
-    // match cli.to {
-    //     OutputTypes::Bedpe => vcf_to_bedpe(vcf, vaf_field)?,
-    //     OutputTypes::BreakendTsv => todo!("BreakendTsv conversion is not yet implemented"),
-    // };
-    //
 
     Ok(())
 }

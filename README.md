@@ -3,11 +3,11 @@
 > [!WARNING]
 > This package is in early development and API is not yet stable 
 
-Convert common genomic biological fileformats into basic tabular data structures.
+Convert biological file formats into tabular formats.
 
 ##  Rationale
 This project supports the [clinsigs](https:://github.com/selkamand/clinsigs) nextflow pipeline for mutational signature analysis. 
-We focus on supporting filetype flavours produced by the oncoanalyser pipeline (e.g. purple enriched VCFs) as this pipeline.
+We focus on flavours of fileformats produced by the oncoanalyser pipeline (e.g. purple enriched VCFs) because it is run upstream of clinsigs.
 
 
 ## Installation

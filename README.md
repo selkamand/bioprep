@@ -26,7 +26,7 @@ Large genomic breaks are commonly represented in VCF files.
 The VCF specification supports multiple representations this but bioprep expects:
 
 1. One row per breakend
-2. ALT alleles encode explicit breakends with square-bracket syntax (`GCA[1:100[``) as opposed to Symbolic ALT alleles (e.g. <DEL>/<INS>)
+2. ALT alleles encode explicit breakends with square-bracket syntax (`GCA[1:100[`) as opposed to Symbolic ALT alleles (e.g. `<DEL>/<INS>`)
 3. Because each breakend may not confidently placed (e.g. imagine a break in a homopolymer region), 
 confidence intervals (bases below / above ) are should be described as INFO field (CIPOS). 
 When CIPOS field is not found we will assume the break is precisely located at POS.

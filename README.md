@@ -96,13 +96,7 @@ Columns include:
 
 ## Performance
 
-We are designing this package for ease of future extension over performance or memory considerations.
+During this early phase of development, we are more focused on ease of future extension than performance.
 
-**Why?**
-1. bioprep is in early development & API is unstable. Any optimisation would be premature and can wait until we have better test coverage.
-2. bioprep performs filetype conversions that in precision medicine pipelines are not meaningfully rate limiting or bloating resource usage to a point meaningfully detrimental 
-
-**Examples**
-
-Conversion of SV VCF files to any other output involves parsing all breakend and breakpoint data into a `StructuralVariants` object whose memory footprint depends on number of PASS breakends/breakpoints & length of ID names.
-This implementation makes new conversions easy to added as transformations of this struct, however no conversions should need all that information in memory at once (or even anything close).
+We do not guarantee a maximum memory footprint for any filetype conversions, however where possible we choose implementation strategies
+that avoid parsing entire files into an object, in favour of iterating through records and streaming converted output.

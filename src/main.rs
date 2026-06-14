@@ -1,10 +1,6 @@
 use anyhow::Result;
-use bioprep::breakend::vcf_to_structural_variants;
 use clap::{Parser, Subcommand, ValueEnum};
-use std::{
-    fmt,
-    path::{Path, PathBuf},
-};
+use std::{fmt, path::PathBuf};
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
 enum VcfTypes {
@@ -83,7 +79,7 @@ fn main() -> Result<()> {
             };
 
             match to {
-                SvOutputTypes::Bedpe => svcf_to_bedpe(&svcf, vaf_field)?,
+                SvOutputTypes::Bedpe => bioprep::conversions::svcf_to_bedpe(&svcf, vaf_field)?,
                 SvOutputTypes::BreakendTsv => todo!(),
             };
         }
@@ -95,17 +91,6 @@ fn main() -> Result<()> {
             todo!("No implementation available for converting vcf to anything");
         }
     };
-
-    Ok(())
-}
-
-fn svcf_to_bedpe(vcf: &Path, vaf_field: &str) -> Result<()> {
-    // Get serialised version fo sv VCF
-    let structural_variants = vcf_to_structural_variants(vcf, vaf_field)?;
-
-    // Print to STDOUT
-    let stdout = std::io::stdout();
-    structural_variants.write_bedpe_tsv(&stdout)?;
 
     Ok(())
 }

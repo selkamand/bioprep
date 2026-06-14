@@ -6,6 +6,9 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Error)]
 pub enum Error {
+    #[error("Failed to find file: {0}")]
+    FileNotFound(PathBuf),
+
     #[error("failed to open or read VCF: {path}")]
     ReadVcf {
         path: PathBuf,
@@ -13,9 +16,8 @@ pub enum Error {
         source: std::io::Error,
     },
 
-    #[error("failed to parse VCF header: {path}")]
+    #[error("failed to parse VCF header")]
     ParseVcfHeader {
-        path: String,
         #[source]
         source: std::io::Error,
     },
@@ -34,9 +36,15 @@ pub enum Error {
         source: std::io::Error,
     },
 
-    #[error("failed to write BEDPE TSV")]
-    WriteBedpe(#[source] csv::Error),
+    #[error("failed to write: {filetype}")]
+    Write {
+        filetype: String,
+        #[source]
+        source: std::io::Error,
+    },
 
+    // #[error("failed to write BEDPE TSV")]
+    // WriteBedpe(#[source] std::io::Error),
     #[error("failed to flush BEDPE TSV writer")]
     FlushBedpe(#[source] std::io::Error),
 

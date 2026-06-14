@@ -83,7 +83,7 @@ fn main() -> Result<()> {
             };
 
             match to {
-                SvOutputTypes::Bedpe => vcf_to_bedpe(&svcf, vaf_field)?,
+                SvOutputTypes::Bedpe => svcf_to_bedpe(&svcf, vaf_field)?,
                 SvOutputTypes::BreakendTsv => todo!(),
             };
         }
@@ -99,7 +99,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn vcf_to_bedpe(vcf: &Path, vaf_field: &str) -> Result<()> {
+fn svcf_to_bedpe(vcf: &Path, vaf_field: &str) -> Result<()> {
     // Get serialised version fo sv VCF
     let structural_variants = vcf_to_structural_variants(vcf, vaf_field)?;
 

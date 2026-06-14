@@ -107,3 +107,21 @@ impl std::fmt::Display for Strand {
         }
     }
 }
+
+/// Structural variants parsed from an SV VCF.
+///
+/// The parsed variants are split into three groups:
+/// - `breakpoints`: complete paired breakends.
+/// - `single_breakends`: breakends with no `MATEID`.
+/// - `unmatched_breakends`: breakends with a `MATEID` whose mate was not found,
+///   usually because the mate was filtered out or absent from the input VCF.
+pub struct StructuralVariants {
+    /// Complete paired breakpoints that can be written to BEDPE.
+    pub breakpoints: Vec<Breakpoint>,
+
+    /// Breakends with no `MATEID`, representing single breakends.
+    pub single_breakends: Vec<Breakend>,
+
+    /// Breakends with a `MATEID` whose mate was not found in the input VCF.
+    pub unmatched_breakends: Vec<Breakend>,
+}

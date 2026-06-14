@@ -23,7 +23,7 @@ cargo install --git https://github.com/selkamand/bioprep
 ## Structural variant VCFs
 
 Large genomic breaks are commonly represented in VCF files.
-The VCF specification supports multiple representations this but bioprep expects:
+The VCF specification supports multiple representations but bioprep expects:
 
 1. One row per breakend
 2. ALT alleles encode explicit breakends with square-bracket syntax (`GCA[1:100[`) as opposed to Symbolic ALT alleles (e.g. `<DEL>/<INS>`)

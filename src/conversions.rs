@@ -16,8 +16,30 @@ use std::{
 ///
 /// The output contains one row per paired [`Breakpoint`]. Single breakends (no MATEID) and
 /// unmatched breakends (has MATEID but mate not found in VCF after filtering) are intentionally excluded
-/// from this bedpe file
+/// from this bedpe file.
 ///
+/// This function will filter for PASS variants and sort breakends in each breakpoint based on POS
+/// (smaller first) or by order in VCF stream if breakends are on different chromosomes.
+///
+/// Outputs a BEDPE-like format data with one row per breakpoint including the following columns:
+///
+/// 1. chrom1: Chromosome of one side of first breakend in pair.
+/// 2. start1: Zero-based starting position of the lower confidence interval of first breakend.
+/// 3. end1: One-based end position of the upper confidence interval of first breakend.
+/// 4. chrom2: Chromosome of second breakend in pair.
+/// 5. start2: Zero-based starting position of the lower confidence interval of second breakend in pair.
+/// 6. end2: One-based end position of the upper confidence interval of second breakend in pair.
+/// 7. name: Breakpoint identifier.
+/// 8. score: quality score (from first breakpoint in svcf)
+/// 9. strand1: strand of the first breakend in pair
+/// 10. strand2: strand for the second breakend in pair
+///
+/// Plus additional columns: (downstream tools like bedtools allow any number of additional columns - these will just be passed-through)
+///
+/// 11. vaf1: purity adjusted VAF of first breakend in pair (e.g. from PURPLE_VAF info field if `--from purple`)
+/// 12. vaf2: purity adjusted VAF of second breakend in pair (e.g. from PURPLE_VAF info field if `--from purple`)
+/// 13. pos1: Zero-based position of first breakend in pair (derived from POS field).
+/// 14. pos2: Zero-based position of second breakend in pair (derived from POS field).
 pub fn svcf_to_bedpe(vcf: &Path, vaf_field: &str) -> Result<()> {
     // Create Reader to VCF
     let mut reader = vcfutils::build_vcf_reader(vcf)?;
@@ -64,13 +86,14 @@ pub fn svcf_to_bedpe(vcf: &Path, vaf_field: &str) -> Result<()> {
             continue;
         };
 
-        // If mate has been seen, create a breakpoint struct
-        // TODO: Choose which breakend is first or second based on Pos (if they're on the same
-        // chromosome)
-        let breakpoint = Breakpoint {
-            first: breakend,
-            second: mate_breakend,
-        };
+        // If mate has been seen on waitlist, create a breakpoint struct
+        // But sort which breakend is 'first' (e.g. chrom1/start1/etc) or second in breakpoint
+        // struct based on the following rules:
+        // (1) if chromosomes are the same, which Pos field is smaller
+        // (2) if chromosomes are not the same, 'first' breakend is based on order in VCF
+        //  - note 'mate_breakend' always occurs earlier in the VCF stream than 'breakend' because of how
+        //  the waitlist stashing works.
+        let breakpoint: Breakpoint = pubtypes::breakpoint_from_vcf_pair(mate_breakend, breakend);
 
         // Write breakpoint to stdout
         crate::pubtypes::write_breakpoint_as_bedpe(&breakpoint, &mut writer)?;

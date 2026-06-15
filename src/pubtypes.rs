@@ -179,7 +179,41 @@ pub fn write_bedpe_header(writer: &mut impl std::io::Write) -> Result<()> {
 
     Ok(())
 }
-/// Basic Strand Enum
+
+fn later_breakend_should_be_first(earlier: &Breakend, later: &Breakend) -> bool {
+    earlier.chrom == later.chrom && later.pos <= earlier.pos
+}
+
+/// Build a [`Breakpoint`] from two mated breakends encountered in VCF order.
+///
+/// `earlier` is the breakend that appeared first in the VCF stream, and `later`
+/// is its mate that appeared later in the VCF stream. These names refer only to
+/// record order in the input VCF, not to genomic coordinate order.
+///
+/// BEDPE output order is assigned as follows:
+///
+/// - if both breakends are on the same chromosome, the breakend with the lower
+///   position is emitted as `first`;
+/// - if both breakends are on different chromosomes, the original VCF order is
+///   preserved, so `earlier` is emitted as `first`.
+///
+/// This function takes ownership of both breakends and moves them into the
+/// returned [`Breakpoint`], avoiding any additional cloning.
+pub(crate) fn breakpoint_from_vcf_pair(earlier: Breakend, later: Breakend) -> Breakpoint {
+    if later_breakend_should_be_first(&earlier, &later) {
+        Breakpoint {
+            first: later,
+            second: earlier,
+        }
+    } else {
+        Breakpoint {
+            first: earlier,
+            second: later,
+        }
+    }
+}
+
+// Basic Strand Enum
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Strand {
     Plus,

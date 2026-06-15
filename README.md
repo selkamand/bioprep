@@ -71,7 +71,7 @@ Plus additional columns: (downstream tools like bedtools allow any number of add
 > Note gridds assigns a QUAL score per breakpoint (so each side of SV should have the same QUAL score - we just use the first one encountered)
 
 > [!NOTE]
-> Which breakend is first / second is determined entirely by the order of the input VCF. Presort by coordinate if you want to guarantee lower coord breakends are chrom1/start1/end1 etc. 
+> Which breakend is first / second is determined by POS if intra-chromosomal, or based on order in the input VCF if inter-chromosaml. 
 
 
 ### Breakend TSV

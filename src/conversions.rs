@@ -116,3 +116,52 @@ pub fn svcf_to_bedpe(vcf: &Path, vaf_field: &str) -> Result<()> {
 
     Ok(())
 }
+
+/// Outputs a TSV with one row per breakend
+/// (each side paired breakpoints will have their own row).
+///
+/// Will filter for PASS variants only
+///
+/// Columns include:
+///
+/// 1. chromosome: Chromosome of breakend.
+/// 2. position: 1-based position of breakend as described by POS column in vcf.
+/// 3. vaf: Purity adjusted variant allele frequency supporting breakend (e.g. from PURPLE_VAF info field if `--from purple`).
+/// 4. id: id of breakend.
+/// 5. mateid: id of mate (set to `.` if single breakend)
+/// 6. qual: quality of breakend.
+pub fn svcf_to_breakend_tsv(vcf: &Path, vaf_field: &str) -> Result<()> {
+    // Create Reader to VCF
+    let mut reader = vcfutils::build_vcf_reader(vcf)?;
+    let header = vcfutils::read_vcf_header(&mut reader)?;
+
+    // Create a buffered writer to stdout
+    let stdout = std::io::stdout().lock();
+    let mut writer = BufWriter::new(stdout);
+
+    // Write header line
+    pubtypes::write_breakend_tsv_header(&mut writer)?;
+
+    for result in reader.records() {
+        let record = result.map_err(|source| Error::ParseVcfRecord {
+            path: vcf.to_owned(),
+            source,
+        })?;
+
+        // Skip non-pass variants
+        if !vcfutils::is_pass(&record, &header)? {
+            continue;
+        }
+
+        // Parse Breakend
+        let breakend = crate::vcfutils::record_to_breakend(&record, &header, vaf_field)?;
+
+        // Write breakend to stdout
+        crate::pubtypes::write_breakend_as_tsv(&breakend, &mut writer)?;
+    }
+
+    // Flush buffer to make sure all breapoints are written to stdout
+    let _ = writer.flush();
+
+    Ok(())
+}

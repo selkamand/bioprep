@@ -76,9 +76,6 @@ Plus additional columns: (downstream tools like bedtools allow any number of add
 
 ### Breakend TSV
 
-> [!WARNING]
-> Breakend TSV conversion not implemented yet
-
 ```
 bioprep svcf -i <vcf> --from purple --to breakend-tsv
 ```

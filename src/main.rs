@@ -1,16 +1,17 @@
 use anyhow::Result;
+use bioprep::conversions::{svcf_to_bedpe, svcf_to_breakend_tsv};
 use clap::{Parser, Subcommand, ValueEnum};
 use std::{fmt, path::PathBuf};
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
-enum VcfTypes {
+enum SvcfTypes {
     Purple,
 }
 
-impl fmt::Display for VcfTypes {
+impl fmt::Display for SvcfTypes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            VcfTypes::Purple => write!(f, "Purple"),
+            SvcfTypes::Purple => write!(f, "Purple"),
         }
     }
 }
@@ -19,6 +20,18 @@ impl fmt::Display for VcfTypes {
 enum SvOutputTypes {
     Bedpe,
     BreakendTsv,
+}
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum SnvVcfTypes {
+    Purple,
+}
+
+impl fmt::Display for SnvVcfTypes {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SnvVcfTypes::Purple => write!(f, "Purple"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ValueEnum)]
@@ -46,8 +59,8 @@ enum Commands {
         svcf: PathBuf,
 
         /// Input sv vcf filetype
-        #[arg(long, value_enum, default_value_t = VcfTypes::Purple)]
-        from: VcfTypes,
+        #[arg(long, value_enum, default_value_t = SvcfTypes::Purple)]
+        from: SvcfTypes,
 
         /// Output filetype
         #[arg(long, value_enum, value_name = "filetype")]
@@ -60,8 +73,8 @@ enum Commands {
         vcf: PathBuf,
 
         /// Input sv vcf filetype
-        #[arg(long, value_enum, default_value_t = VcfTypes::Purple)]
-        from: VcfTypes,
+        #[arg(long, value_enum, default_value_t = SnvVcfTypes::Purple)]
+        from: SnvVcfTypes,
 
         /// Output filetype
         #[arg(long, value_enum, value_name = "filetype")]
@@ -75,12 +88,12 @@ fn main() -> Result<()> {
     match cli.command {
         Commands::Svcf { svcf, from, to } => {
             let vaf_field = match from {
-                VcfTypes::Purple => "PURPLE_AF",
+                SvcfTypes::Purple => "PURPLE_AF",
             };
 
             match to {
-                SvOutputTypes::Bedpe => bioprep::conversions::svcf_to_bedpe(&svcf, vaf_field)?,
-                SvOutputTypes::BreakendTsv => todo!(),
+                SvOutputTypes::Bedpe => svcf_to_bedpe(&svcf, vaf_field)?,
+                SvOutputTypes::BreakendTsv => svcf_to_breakend_tsv(&svcf, vaf_field)?,
             };
         }
         Commands::Vcf {

@@ -180,6 +180,35 @@ pub fn write_bedpe_header(writer: &mut impl std::io::Write) -> Result<()> {
     Ok(())
 }
 
+/// Write a breakpoint as a bedpe
+pub fn write_breakend_as_tsv(breakend: &Breakend, writer: &mut impl std::io::Write) -> Result<()> {
+    writeln!(
+        writer,
+        "{}\t{}\t{}\t{}\t{}\t{}",
+        breakend.chrom,
+        breakend.pos,
+        breakend.vaf,
+        breakend.id,
+        breakend.mateid.clone().unwrap_or(".".to_owned()),
+        breakend.qual,
+    )
+    .map_err(|err| Error::Write {
+        filetype: "BEDPE tsv".to_owned(),
+        source: err,
+    })?;
+
+    Ok(())
+}
+
+pub fn write_breakend_tsv_header(writer: &mut impl std::io::Write) -> Result<()> {
+    writeln!(writer, "chrom\tpos\tvaf\tid\tmateid\tqual").map_err(|err| Error::Write {
+        filetype: "breakend-tsv".to_owned(),
+        source: err,
+    })?;
+
+    Ok(())
+}
+
 fn later_breakend_should_be_first(earlier: &Breakend, later: &Breakend) -> bool {
     earlier.chrom == later.chrom && later.pos <= earlier.pos
 }

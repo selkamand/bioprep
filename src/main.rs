@@ -68,11 +68,11 @@ enum Commands {
     },
     /// Convert SNV/INDEL mutation VCF file to other file formats
     Vcf {
-        /// Path to a structural variant vcf
+        /// Path to a SNV/MNV/INDEL variant vcf
         #[arg(short = 'i', long = "input", value_name = "vcf")]
         vcf: PathBuf,
 
-        /// Input sv vcf filetype
+        /// What type of SNV vcf was supplied
         #[arg(long, value_enum, default_value_t = SnvVcfTypes::Purple)]
         from: SnvVcfTypes,
 

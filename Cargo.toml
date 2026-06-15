@@ -2,7 +2,7 @@
 name = "bioprep"
 version = "0.0.1"
 edition = "2024"
-repository = "https://github.com/selkamand/svcf"
+repository = "https://github.com/selkamand/bioprep"
 
 [dependencies]
 anyhow = "1.0.102"

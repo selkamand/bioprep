@@ -173,6 +173,14 @@ pub fn svcf_to_breakend_tsv(vcf: &Path, vaf_field: &str) -> Result<()> {
 ///
 /// This function will return an error if input VCF has multiallelic sites - the error message will
 /// tell user to normalise with bcftools norm to split these multiallelic sites.
+///
+///
+/// 1. chrom: Chromosome of breakend.
+/// 2. pos: one-based position of variant
+/// 3. ref: reference sequence
+/// 4. alt: alternate sequence
+/// 5. vaf: variant allele frequency of tumour sample (adjusted for purity). Must be an INFO field (not FORMAT).
+
 pub fn snv_vcf_to_tsv(vcf: &Path, vaf_field: &str) -> Result<()> {
     let mut reader = vcfutils::build_vcf_reader(vcf)?;
     let header = vcfutils::read_vcf_header(&mut reader)?;

@@ -110,7 +110,7 @@ Outputs a TSV with one row per small mutation Columns include:
 1. chrom: Chromosome of breakend.
 2. pos: one-based position of variant
 3. ref: reference sequence
-4. alt: alternate bases
+4. alt: alternate sequence
 5. vaf: variant allele frequency of tumour sample (adjusted for purity). Must be an INFO field (not FORMAT).
 
 > [!NOTE]

@@ -91,6 +91,37 @@ Columns include:
 5. mateid: id of mate (set to `.` if single breakend)
 6. qual: quality of breakend.
 
+> [!NOTE]
+> Only PASS variants will be included in the result
+
+## SNV/MNV/INDEL Variant VCFs
+
+Tumour-normal variant callers like Sage produce a VCF file describing SNVs, MNVs, and INDELs.
+
+
+### TSV 
+
+```
+bioprep vcf -i <vcf> --from purple --to tsv
+```
+
+Outputs a TSV with one row per small mutation Columns include: 
+
+1. chrom: Chromosome of breakend.
+2. pos: one-based position of variant
+3. ref: reference sequence
+4. alt: alternate bases
+5. vaf: variant allele frequency of tumour sample (adjusted for purity). Must be an INFO field (not FORMAT).
+
+> [!NOTE]
+> Only PASS variants will be included in the result
+
+> [!WARNING]
+> This conversion will not left-align indels or split multiallelics. 
+> We recommend normalising with `bcftools norm --multiallelic - --check-ref e -f ${reference_genome_fasta} ${vcf}` 
+> before converting to a TSV with this script
+
+
 ## Performance
 
 During this early phase of development, we are more focused on ease of future extension than performance.

@@ -160,7 +160,55 @@ pub fn svcf_to_breakend_tsv(vcf: &Path, vaf_field: &str) -> Result<()> {
         crate::pubtypes::write_breakend_as_tsv(&breakend, &mut writer)?;
     }
 
-    // Flush buffer to make sure all breapoints are written to stdout
+    // Flush buffer to make sure all breakends are written to stdout
+    let _ = writer.flush();
+
+    Ok(())
+}
+
+/// Output a TSV with one row per mutation
+///
+/// vaf_field should represent the INFO field of VCF describing purity adjusted variant allelic
+/// frequency
+///
+/// This function will return an error if input VCF has multiallelic sites - the error message will
+/// tell user to normalise with bcftools norm to split these multiallelic sites.
+pub fn snv_vcf_to_tsv(vcf: &Path, vaf_field: &str) -> Result<()> {
+    let mut reader = vcfutils::build_vcf_reader(vcf)?;
+    let header = vcfutils::read_vcf_header(&mut reader)?;
+
+    // Create a buffered writer to stdout
+    let stdout = std::io::stdout().lock();
+    let mut writer = BufWriter::new(stdout);
+
+    // Write header line
+    pubtypes::write_snv_tsv_header(&mut writer)?;
+
+    // TODO: because this function expects purple VCF files where VAF field (PURPLE_AF) is an INFO field not a FORMAT field,
+    // the user doesn't need to supply the tumour sample name.
+    // However for FORMAT fields like non purity adjusted AF or depth (DP) we will need
+    // user to provide tumour ID information
+
+    // Iterate through VCF
+    for result in reader.records() {
+        let record = result.map_err(|source| Error::ParseVcfRecord {
+            path: vcf.to_owned(),
+            source,
+        })?;
+
+        // Skip non-pass variants
+        if !vcfutils::is_pass(&record, &header)? {
+            continue;
+        }
+
+        // Parse Variant
+        let mutation = crate::vcfutils::record_to_mutation(&record, &header, vaf_field)?;
+
+        // Write snvs to stdout
+        crate::pubtypes::write_mutation_as_tsv(&mutation, &mut writer)?;
+    }
+
+    // Flush buffer to make sure all mutations are written to stdout
     let _ = writer.flush();
 
     Ok(())

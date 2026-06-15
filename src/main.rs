@@ -1,5 +1,5 @@
 use anyhow::Result;
-use bioprep::conversions::{svcf_to_bedpe, svcf_to_breakend_tsv};
+use bioprep::conversions::{snv_vcf_to_tsv, svcf_to_bedpe, svcf_to_breakend_tsv};
 use clap::{Parser, Subcommand, ValueEnum};
 use std::{fmt, path::PathBuf};
 
@@ -36,7 +36,7 @@ impl fmt::Display for SnvVcfTypes {
 
 #[derive(Debug, Clone, PartialEq, Eq, ValueEnum)]
 enum SnvOutputTypes {
-    Maf,
+    Tsv,
 }
 
 #[derive(Parser)]
@@ -86,6 +86,7 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
+        // SV conversions
         Commands::Svcf { svcf, from, to } => {
             let vaf_field = match from {
                 SvcfTypes::Purple => "PURPLE_AF",
@@ -96,12 +97,21 @@ fn main() -> Result<()> {
                 SvOutputTypes::BreakendTsv => svcf_to_breakend_tsv(&svcf, vaf_field)?,
             };
         }
-        Commands::Vcf {
-            vcf: _,
-            from: _,
-            to: _,
-        } => {
-            todo!("No implementation available for converting vcf to anything");
+
+        // VCF conversions
+        Commands::Vcf { vcf, from, to } => {
+            let vaf_field = match from {
+                SnvVcfTypes::Purple => "PURPLE_AF",
+            };
+            let depth_field = match from {
+                SnvVcfTypes::Purple => "DP",
+            };
+            let vaf_unadjusted_field = match from {
+                SnvVcfTypes::Purple => "AF",
+            };
+            match to {
+                SnvOutputTypes::Tsv => snv_vcf_to_tsv(&vcf, vaf_field)?,
+            }
         }
     };
 

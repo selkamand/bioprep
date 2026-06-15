@@ -1,6 +1,23 @@
 use crate::error::Error;
 use crate::error::Result;
 
+// A Small Varaitn
+pub struct Mutation {
+    pub chrom: String,
+
+    // A 1-based VCF style position of the variant
+    pub pos: u64,
+
+    // Reference Sequence
+    pub reference: String,
+
+    // Alternative Sequence
+    pub alternative: String,
+
+    // A purity adjusted variant allele frequency
+    pub vaf: f32,
+}
+
 /// A single structural-variant breakend parsed from a VCF record.
 ///
 /// A breakend represents one side of a structural variant breakpoint. Paired
@@ -240,6 +257,29 @@ pub(crate) fn breakpoint_from_vcf_pair(earlier: Breakend, later: Breakend) -> Br
             second: later,
         }
     }
+}
+
+pub fn write_snv_tsv_header(writer: &mut impl std::io::Write) -> Result<()> {
+    writeln!(writer, "chrom\tpos\tref\talt\tvaf").map_err(|err| Error::Write {
+        filetype: "snv-tsv".to_owned(),
+        source: err,
+    })?;
+
+    Ok(())
+}
+
+pub fn write_mutation_as_tsv(mutation: &Mutation, writer: &mut impl std::io::Write) -> Result<()> {
+    writeln!(
+        writer,
+        "{}\t{}\t{}\t{}\t{}",
+        mutation.chrom, mutation.pos, mutation.reference, mutation.alternative, mutation.vaf,
+    )
+    .map_err(|err| Error::Write {
+        filetype: "snv-tsv".to_owned(),
+        source: err,
+    })?;
+
+    Ok(())
 }
 
 // Basic Strand Enum

@@ -1,10 +1,14 @@
 //! Assorted utilities for working with VCF files
 
+use crate::error;
 use crate::error::Error;
 use crate::error::Result;
+use crate::pubtypes;
 use crate::pubtypes::Breakend;
+use crate::pubtypes::Mutation;
 use crate::pubtypes::Strand;
 use noodles::vcf;
+use noodles::vcf::variant::Record;
 use noodles::vcf::variant::record::AlternateBases;
 use noodles::vcf::variant::record::Filters;
 use noodles::vcf::variant::record::Ids;
@@ -358,6 +362,71 @@ pub(crate) fn read_vcf_header(
         Err(e) => Err(Error::ParseVcfHeader { source: e }),
     }
     // .map_err(|err| ));
+}
+
+// Convert Record to Small mutation type
+pub fn record_to_mutation(
+    record: &vcf::Record,
+    header: &vcf::Header,
+    vaf_field: &str,
+) -> Result<Mutation> {
+    // Grab Chrom
+    let chrom = record.reference_sequence_name();
+    let pos = parse_position(record)?;
+    let reference = record.reference_bases();
+    let alternative_alleles = parse_alternative_allele_but_error_if_multiallelic(record)?;
+    let vaf = parse_vaf(record, header, vaf_field)?;
+
+    Ok(Mutation {
+        chrom: chrom.to_owned(),
+        pos,
+        reference: reference.to_owned(),
+        alternative: alternative_alleles,
+        vaf,
+    })
+}
+
+/// Parse a 1-based position from a record or return an error if the position is invalid.
+pub(crate) fn parse_position(record: &vcf::Record) -> Result<u64> {
+    let invalid_position = |message: String| Error::InvalidVariantRecord {
+        variant: extract_chrom_pos_ref_alt_neverfail(record),
+        message,
+    };
+
+    let Some(pos_result) = record.variant_start() else {
+        return Err(invalid_position("no valid position found".to_owned()));
+    };
+
+    let position = pos_result.map_err(|source| {
+        invalid_position(format!("error trying to access position field: {source}"))
+    })?;
+
+    let pos: u64 = position
+        .get()
+        .try_into()
+        .map_err(|_| invalid_position("position could not be converted to u64".to_owned()))?;
+
+    Ok(pos)
+}
+
+// let invalid_position = |message: String| Error::InvalidVariantRecord {
+//         variant: extract_chrom_pos_ref_alt_neverfail(record),
+//         message,
+//     };
+//
+
+fn parse_alternative_allele_but_error_if_multiallelic(record: &vcf::Record) -> Result<String> {
+    let altbases = record.alternate_bases();
+    let first_or_dot = altbases.iter().next().unwrap_or(Ok(".")).unwrap_or(".");
+
+    if altbases.len() > 1 {
+        return Err(Error::multiple_alternative_alleles(
+            extract_chrom_pos_ref_alt_neverfail(record),
+            "Multiallelics are not supported. Please remove by running `bcftools norm` and retry",
+        ));
+    }
+
+    return Ok(first_or_dot.to_owned());
 }
 
 /// Parse a noodles SV vcf record into a Breakend

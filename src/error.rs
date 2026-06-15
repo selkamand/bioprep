@@ -63,6 +63,9 @@ pub enum Error {
     #[error("invalid ALT allele {alt:?}: failed to infer breakend strand")]
     InvalidAlt { alt: String },
 
+    #[error("Multiple ALT allels in record {variant}: {message}")]
+    MultipleAlternativeAlleles { variant: String, message: String },
+
     #[error("integer conversion failed")]
     IntConversion(#[from] std::num::TryFromIntError),
 }
@@ -87,6 +90,16 @@ impl Error {
     pub(crate) fn invalid_info(field: impl Into<String>, message: impl Into<String>) -> Self {
         Self::InvalidInfo {
             field: field.into(),
+            message: message.into(),
+        }
+    }
+
+    pub(crate) fn multiple_alternative_alleles(
+        variant: impl Into<String>,
+        message: impl Into<String>,
+    ) -> Self {
+        Self::MultipleAlternativeAlleles {
+            variant: variant.into(),
             message: message.into(),
         }
     }

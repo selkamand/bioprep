@@ -315,7 +315,7 @@ pub fn write_svcf_as_breakend_tsv<W: Write>(
 /// 5. vaf: variant allele frequency of tumour sample (adjusted for purity). Must be an INFO field (not FORMAT).
 pub fn convert_snv_vcf_to_tsv(vcf: &Path, options: SnvToolConfig) -> Result<()> {
     let stdout = std::io::stdout();
-    let stderr = std::io::stdout();
+    let stderr = std::io::stderr();
     let stats = write_snv_vcf_as_tsv(vcf, options, stdout.lock())?;
     stats
         .print_summary(stderr.lock())

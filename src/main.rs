@@ -1,6 +1,6 @@
 use anyhow::Result;
 use bioprep::conversions::{snv_vcf_to_tsv, svcf_to_bedpe, svcf_to_breakend_tsv};
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand, ValueEnum, ValueHint};
 use std::{fmt, path::PathBuf};
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -42,8 +42,9 @@ enum SnvOutputTypes {
 #[derive(Parser)]
 #[command(
     version,
-    about = "Transform structural variant VCFs to other formats",
-    long_about = None
+    about = "Prepare biological variant files and tally common mutation classes",
+    long_about = None,
+    subcommand_required = true,
 )]
 struct Cli {
     #[command(subcommand)]
@@ -51,15 +52,16 @@ struct Cli {
 }
 
 #[derive(Subcommand)]
+#[command()]
 enum Commands {
     /// Convert svcf file to other file formats
     Svcf {
         /// Path to a structural variant vcf
-        #[arg(short = 'i', long = "input", value_name = "vcf")]
+        #[arg(short = 'i', long = "input", value_name = "vcf", value_hint = ValueHint::FilePath)]
         svcf: PathBuf,
 
         /// Input sv vcf filetype
-        #[arg(long, value_enum, default_value_t = SvcfTypes::Purple)]
+        #[arg(long, value_enum, value_name = "tool")]
         from: SvcfTypes,
 
         /// Output filetype
@@ -69,16 +71,56 @@ enum Commands {
     /// Convert SNV/INDEL mutation VCF file to other file formats
     Vcf {
         /// Path to a SNV/MNV/INDEL variant vcf
-        #[arg(short = 'i', long = "input", value_name = "vcf")]
+        #[arg(short = 'i', long = "input", value_name = "vcf", value_hint = ValueHint::FilePath)]
         vcf: PathBuf,
 
         /// What type of SNV vcf was supplied
-        #[arg(long, value_enum, default_value_t = SnvVcfTypes::Purple)]
+        #[arg(long, value_enum, value_name = "tool")]
         from: SnvVcfTypes,
 
         /// Output filetype
         #[arg(long, value_enum, value_name = "filetype")]
         to: SnvOutputTypes,
+    },
+
+    /// Tally variants into mutational signature classification schemes
+    Tally {
+        #[command(subcommand)]
+        scheme: ClassificationSchemes,
+    },
+}
+
+#[derive(Subcommand)]
+enum ClassificationSchemes {
+    /// Tally SNVs into SBS96 trinucleotide classes
+    Sbs96 {
+        /// Path to a standardised bioprep SNV TSV
+        #[arg(long = "snv-tsv", value_name = "tsv", value_hint = ValueHint::FilePath)]
+        snv_tsv: PathBuf,
+
+        /// Reference genome FASTA used to fetch trinucleotide context
+        #[arg(short = 'r', long = "reference", value_name = "fasta", value_hint = ValueHint::FilePath)]
+        reference: PathBuf,
+    },
+    /// Tally SNVs into SBS6 substitution classes
+    Sbs6 {
+        /// Path to a standardised bioprep SNV TSV
+        #[arg(long = "snv-tsv", value_name = "tsv", value_hint = ValueHint::FilePath)]
+        snv_tsv: PathBuf,
+
+        /// Reference genome FASTA used to fetch trinucleotide context
+        #[arg(short = 'r', long = "reference", value_name = "fasta", value_hint = ValueHint::FilePath)]
+        reference: PathBuf,
+    },
+    /// Validate SV32 inputs. Classification rules are not implemented yet.
+    Sv32 {
+        /// Path to a standardised bioprep BEDPE-like TSV
+        #[arg(long = "bedpe", value_name = "tsv", value_hint = ValueHint::FilePath)]
+        bedpe: PathBuf,
+
+        /// Reference genome FASTA
+        #[arg(short = 'r', long = "reference", value_name = "fasta", value_hint = ValueHint::FilePath)]
+        reference: PathBuf,
     },
 }
 

@@ -1,17 +1,20 @@
 use anyhow::Result;
-use bioprep::conversions::{snv_vcf_to_tsv, svcf_to_bedpe, svcf_to_breakend_tsv};
+use bioprep::{
+    config::{SnvTool, SvTool, configure_for_snv_tool},
+    conversions::{convert_snv_vcf_to_tsv, convert_svcf_to_bedpe, convert_svcf_to_breakend_tsv},
+};
 use clap::{Parser, Subcommand, ValueEnum, ValueHint};
 use std::{fmt, path::PathBuf};
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
-enum SvcfTypes {
+enum SvcfTool {
     Purple,
 }
 
-impl fmt::Display for SvcfTypes {
+impl fmt::Display for SvcfTool {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SvcfTypes::Purple => write!(f, "Purple"),
+            SvcfTool::Purple => write!(f, "Purple"),
         }
     }
 }
@@ -77,7 +80,7 @@ enum ConversionInputCommands {
 
         /// Input sv vcf filetype
         #[arg(long, value_enum, value_name = "tool")]
-        from: SvcfTypes,
+        from: SvTool,
 
         /// Output filetype
         #[arg(long, value_enum, value_name = "filetype")]
@@ -91,7 +94,7 @@ enum ConversionInputCommands {
 
         /// What type of SNV vcf was supplied
         #[arg(long, value_enum, value_name = "tool")]
-        from: SnvVcfTypes,
+        from: SnvTool,
 
         /// Output filetype
         #[arg(long, value_enum, value_name = "filetype")]
@@ -139,28 +142,18 @@ fn main() -> Result<()> {
     match cli.command {
         Commands::Convert { input } => match input {
             ConversionInputCommands::Svcf { svcf, from, to } => {
-                let vaf_field = match from {
-                    SvcfTypes::Purple => "PURPLE_AF",
-                };
+                let config = bioprep::config::configure_for_sv_tool(from);
 
                 match to {
-                    SvOutputTypes::Bedpe => svcf_to_bedpe(&svcf, vaf_field)?,
-                    SvOutputTypes::BreakendTsv => svcf_to_breakend_tsv(&svcf, vaf_field)?,
+                    SvOutputTypes::Bedpe => convert_svcf_to_bedpe(&svcf, config)?,
+                    SvOutputTypes::BreakendTsv => convert_svcf_to_breakend_tsv(&svcf, config)?,
                 };
             }
 
             ConversionInputCommands::Vcf { vcf, from, to } => {
-                let vaf_field = match from {
-                    SnvVcfTypes::Purple => "PURPLE_AF",
-                };
-                let _depth_field = match from {
-                    SnvVcfTypes::Purple => "DP",
-                };
-                let _vaf_unadjusted_field = match from {
-                    SnvVcfTypes::Purple => "AF",
-                };
+                let config = configure_for_snv_tool(from);
                 match to {
-                    SnvOutputTypes::Tsv => snv_vcf_to_tsv(&vcf, vaf_field)?,
+                    SnvOutputTypes::Tsv => convert_snv_vcf_to_tsv(&vcf, config)?,
                 }
             }
         },

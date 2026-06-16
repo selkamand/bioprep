@@ -1,12 +1,133 @@
-// End to end conversions of file formats from one to another
-// Where inputs are filetypes and outputs are writers
+//! End to end conversions of between biological file formats.
 
 use crate::{
+    config::{SnvToolConfig, SvToolConfig},
     error::{Error, Result},
     pubtypes::{self, Breakend, Breakpoint, BreakpointBedpe},
     vcfutils,
 };
-use std::{collections::HashMap, path::Path};
+use std::{collections::HashMap, io::Write, path::Path};
+
+// Define Fundamental Structs
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct MutationConversionStats {
+    pub total_records: u64,
+    pub pass_records: u64,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct BreakendConversionStats {
+    pub total_breakends_before_filtering: u64,
+    pub total_breakends_after_filtering: u64,
+    pub single_breakends_after_filtering: u64,
+    pub paired_breakends_after_filtering: u64,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct BreakpointConversionStats {
+    pub total_breakends_before_filtering: u64,
+    pub total_breakends_after_filtering: u64,
+    pub proper_breakpoints: u64,
+    pub single_breakends: u64,
+    pub unmatched_breakends: u64,
+}
+impl MutationConversionStats {
+    pub fn print_summary(&self, mut writer: impl Write) -> std::io::Result<()> {
+        writeln!(writer, "\n=============\nSummary\n=============")?;
+        writeln!(
+            writer,
+            "{} total mutations in input file",
+            self.total_records
+        )?;
+        writeln!(
+            writer,
+            "{} mutations after PASS-filtering",
+            self.pass_records
+        )?;
+        writeln!(
+            writer,
+            "\nThe {} pass mutations were converted",
+            self.pass_records
+        )?;
+        Ok(())
+    }
+}
+
+impl BreakendConversionStats {
+    pub fn print_summary(&self, mut writer: impl Write) -> std::io::Result<()> {
+        writeln!(writer, "\n=============\nSummary\n=============")?;
+        writeln!(
+            writer,
+            "{} total breakends in input file",
+            self.total_breakends_before_filtering
+        )?;
+        writeln!(
+            writer,
+            "{} breakends after PASS-filtering",
+            self.total_breakends_after_filtering
+        )?;
+        writeln!(
+            writer,
+            "{}/{} are single breakends",
+            self.single_breakends_after_filtering, self.total_breakends_after_filtering,
+        )?;
+        writeln!(
+            writer,
+            "{}/{} breakends are paired (MATEID field present)",
+            self.paired_breakends_after_filtering, self.total_breakends_after_filtering,
+        )?;
+        writeln!(
+            writer,
+            "Note we have not verified that the MATEIDs match IDs present in VCF"
+        )?;
+        writeln!(
+            writer,
+            "\nThe {} pass breakends have been converted",
+            self.total_breakends_after_filtering
+        )?;
+
+        Ok(())
+    }
+}
+
+impl BreakpointConversionStats {
+    pub fn print_summary(&self, mut writer: impl Write) -> std::io::Result<()> {
+        writeln!(writer, "\n=============\nSummary\n=============")?;
+        writeln!(
+            writer,
+            "{} total breakends in input file",
+            self.total_breakends_before_filtering
+        )?;
+        writeln!(
+            writer,
+            "{} breakends after PASS-filtering",
+            self.total_breakends_after_filtering
+        )?;
+        writeln!(
+            writer,
+            "{} proper breakpoints (pairs of breakends that both survived filtering)",
+            self.proper_breakpoints
+        )?;
+        writeln!(
+            writer,
+            "{} single breakends (no MATEID)",
+            self.single_breakends
+        )?;
+        writeln!(
+            writer,
+            "{} unmatched breakends (had MATEID but mate not in VCF after filtering)",
+            self.unmatched_breakends
+        )?;
+        writeln!(
+            writer,
+            "\nThe {} proper breakpoints were converted",
+            self.proper_breakpoints
+        )?;
+
+        Ok(())
+    }
+}
 
 /// Convert Structural Variant VCF to a BEDPE-like TSV format file
 ///
@@ -36,100 +157,76 @@ use std::{collections::HashMap, path::Path};
 /// 12. vaf2: purity adjusted VAF of second breakend in pair (e.g. from PURPLE_VAF info field if `--from purple`)
 /// 13. pos1: Zero-based position of first breakend in pair (derived from POS field).
 /// 14. pos2: Zero-based position of second breakend in pair (derived from POS field).
-pub fn svcf_to_bedpe(vcf: &Path, vaf_field: &str) -> Result<()> {
-    // Create Reader to VCF
-    let mut reader = vcfutils::build_vcf_reader(vcf)?;
-    let header = vcfutils::read_vcf_header(&mut reader)?;
-
-    // Create a buffered writer to stdout
+pub fn convert_svcf_to_bedpe(vcf: &Path, options: SvToolConfig) -> Result<()> {
     let stdout = std::io::stdout();
-    let handle = stdout.lock();
+    let stderr = std::io::stderr();
+    let stats = write_svcf_as_bedpe(vcf, options, stdout.lock())?;
+    stats
+        .print_summary(stderr.lock())
+        .map_err(|source| Error::write("stats", source))?;
+    Ok(())
+}
+
+/// Write a structural variant VCF as BEDPE-like TSV.
+///
+/// The output contains one row per paired [`Breakpoint`]. Single breakends (no MATEID) and
+/// unmatched breakends (has MATEID but mate not found in VCF after filtering) are intentionally
+/// excluded.
+///
+/// See [`convert_svcf_to_bedpe`] docs for full breakdown of output filetype
+pub fn write_svcf_as_bedpe<W: Write>(
+    vcf: &Path,
+    options: SvToolConfig,
+    writer: W,
+) -> Result<BreakpointConversionStats> {
+    let mut reader = vcfutils::build_vcf_reader(vcf)?;
+    let header = vcfutils::read_vcf_header(&mut reader, vcf)?;
 
     let mut writer = csv::WriterBuilder::new()
         .has_headers(true)
         .delimiter(b'\t')
-        .from_writer(handle);
+        .from_writer(writer);
 
-    // Write header line
-    // pubtypes::write_bedpe_header(&mut writer)?;
-
-    // Setup iterators
-    let mut n_single_breakends: u32 = 0;
-    let mut n_proper_breakpoints: u32 = 0;
-    let mut total_breakends_before_filtering: u32 = 0;
-    let mut total_breakends_after_filtering: u32 = 0;
-
-    // Setup a hashmap waitlist which breakends will be stashed in until we find their mate
+    let mut stats = BreakpointConversionStats::default();
     let mut waitlist: HashMap<String, Breakend> = HashMap::new();
-    for result in reader.records() {
-        total_breakends_before_filtering += 1;
-        let record = result.map_err(|source| Error::ParseVcfRecord {
-            path: vcf.to_owned(),
-            source,
-        })?;
 
-        // Skip non-pass variants
+    for result in reader.records() {
+        stats.total_breakends_before_filtering += 1;
+        let record = result.map_err(|source| Error::parse_vcf_record(vcf, source))?;
+
         if !vcfutils::is_pass(&record, &header)? {
             continue;
         }
-        total_breakends_after_filtering += 1;
-        // Parse Breakend
-        let breakend = crate::vcfutils::record_to_breakend(&record, &header, vaf_field)?;
 
-        // Skip the rest of loop if its a single breaken
+        stats.total_breakends_after_filtering += 1;
+        let breakend = crate::vcfutils::record_to_breakend(&record, &header, &options.vaf_field)?;
+
         let Some(mateid) = &breakend.mateid else {
-            n_single_breakends += 1;
+            stats.single_breakends += 1;
             continue;
         };
 
-        // Add breakend to waitlist if mate hasn't been seen before
-        // Otherwise pull mate breakend from the waitlist (deleting it from the hashmap to save
-        // memory)
         let Some(mate_breakend) = waitlist.remove(mateid) else {
             waitlist.insert(breakend.id.clone(), breakend);
             continue;
         };
 
-        // If mate has been seen on waitlist, create a breakpoint struct
-        // But sort which breakend is 'first' (e.g. chrom1/start1/etc) or second in breakpoint
-        // struct based on the following rules:
-        // (1) if chromosomes are the same, which Pos field is smaller
-        // (2) if chromosomes are not the same, 'first' breakend is based on order in VCF
-        //  - note 'mate_breakend' always occurs earlier in the VCF stream than 'breakend' because of how
-        //  the waitlist stashing works.
         let breakpoint: Breakpoint = pubtypes::breakpoint_from_vcf_pair(mate_breakend, breakend);
         let bedpe: BreakpointBedpe = pubtypes::breakpoint_to_breakpoint_bedpe(breakpoint);
 
-        // Write breakend to stdout using serde serialization
-        // Serialize based on mutation serialize trait and write to stdout
-        writer.serialize(bedpe).map_err(|err| Error::Write {
-            filetype: "bedpev".to_owned(),
-            source: Box::new(err),
-        })?;
+        writer
+            .serialize(bedpe)
+            .map_err(|source| Error::write("bedpe", source))?;
 
-        // Add tally of paired breakends
-        n_proper_breakpoints += 1;
+        stats.proper_breakpoints += 1;
     }
 
-    // Flush buffer to make sure all breapoints are written to stdout
-    let _ = writer.flush();
+    writer
+        .flush()
+        .map_err(|source| Error::flush("bedpe", source))?;
 
-    // Count number of breakends that were lift in waitlist (we never found their mate in the VCF)
-    let n_unmatched_breakends = waitlist.len();
-    // Check how many single breakends we had left
-    eprintln!("\n=============\nSummary\n=============");
-    eprintln!("{total_breakends_before_filtering} total breakends in file");
-    eprintln!("{total_breakends_after_filtering} breakends after PASS-filtering");
-    eprintln!(
-        "{n_proper_breakpoints} proper breakpoints (pairs of breakends that both survived filtering)"
-    );
-    eprintln!("{n_single_breakends} single breakends (no MATEID)");
-    eprintln!(
-        "{n_unmatched_breakends} unmatched breakends (had MATEID but mate not in VCF after filtering)"
-    );
-    eprintln!("\nOnly the {n_proper_breakpoints} proper breakpoints were output");
-
-    Ok(())
+    stats.unmatched_breakends = waitlist.len() as u64;
+    Ok(stats)
 }
 
 /// Outputs a TSV with one row per breakend
@@ -145,56 +242,61 @@ pub fn svcf_to_bedpe(vcf: &Path, vaf_field: &str) -> Result<()> {
 /// 4. id: id of breakend.
 /// 5. mateid: id of mate (set to `.` if single breakend)
 /// 6. qual: quality of breakend.
-pub fn svcf_to_breakend_tsv(vcf: &Path, vaf_field: &str) -> Result<()> {
-    // Create Reader to VCF
-    let mut reader = vcfutils::build_vcf_reader(vcf)?;
-    let header = vcfutils::read_vcf_header(&mut reader)?;
-
-    // Create a buffered writer to stdout
+pub fn convert_svcf_to_breakend_tsv(vcf: &Path, options: SvToolConfig) -> Result<()> {
     let stdout = std::io::stdout();
-    let handle = stdout.lock();
+    let stderr = std::io::stderr();
 
-    // let mut writer = csv::WriterBuilder()from_writer(handle);
+    let stats = write_svcf_as_breakend_tsv(vcf, options, stdout.lock())?;
+    stats
+        .print_summary(stderr.lock())
+        .map_err(|source| Error::write("stats", source))?;
+    Ok(())
+}
+
+/// Write a structural variant VCF as breakend TSV.
+pub fn write_svcf_as_breakend_tsv<W: Write>(
+    vcf: &Path,
+    options: SvToolConfig,
+    writer: W,
+) -> Result<BreakendConversionStats> {
+    let mut reader = vcfutils::build_vcf_reader(vcf)?;
+    let header = vcfutils::read_vcf_header(&mut reader, vcf)?;
+
     let mut writer = csv::WriterBuilder::new()
         .has_headers(true)
         .delimiter(b'\t')
-        .from_writer(handle);
+        .from_writer(writer);
 
-    // Write header line
-    // pubtypes::write_breakend_tsv_header(&mut writer)?;
+    let mut stats = BreakendConversionStats::default();
 
     for result in reader.records() {
-        let record = result.map_err(|source| Error::ParseVcfRecord {
-            path: vcf.to_owned(),
-            source,
-        })?;
+        stats.total_breakends_before_filtering += 1;
+        let record = result.map_err(|source| Error::parse_vcf_record(vcf, source))?;
 
-        // Skip non-pass variants
         if !vcfutils::is_pass(&record, &header)? {
             continue;
         }
 
-        // Parse Breakend
-        // TODO: Add a record_to_simplebreakend function
-        let breakend = crate::vcfutils::record_to_breakend(&record, &header, vaf_field)?;
+        stats.total_breakends_after_filtering += 1;
+        let breakend = crate::vcfutils::record_to_breakend(&record, &header, &options.vaf_field)?;
         let simplebreakend = crate::pubtypes::breakend_to_simple_breakend(&breakend);
 
-        // Write breakend to stdout using serde serialization
-        // Serialize based on mutation serialize trait and write to stdout
+        if pubtypes::breakend_is_single(&breakend) {
+            stats.single_breakends_after_filtering += 1
+        } else {
+            stats.paired_breakends_after_filtering += 1
+        }
+
         writer
             .serialize(simplebreakend)
-            .map_err(|err| Error::Write {
-                filetype: "breakend-tsv".to_owned(),
-                source: Box::new(err),
-            })?;
-
-        // crate::pubtypes::write_breakend_as_tsv(&breakend, &mut writer)?;
+            .map_err(|source| Error::write("breakend-tsv", source))?;
     }
 
-    // Flush buffer to make sure all breakends are written to stdout
-    let _ = writer.flush();
+    writer
+        .flush()
+        .map_err(|source| Error::flush("breakend-tsv", source))?;
 
-    Ok(())
+    Ok(stats)
 }
 
 /// Output a TSV with one row per mutation
@@ -211,49 +313,56 @@ pub fn svcf_to_breakend_tsv(vcf: &Path, vaf_field: &str) -> Result<()> {
 /// 3. ref: reference sequence
 /// 4. alt: alternate sequence
 /// 5. vaf: variant allele frequency of tumour sample (adjusted for purity). Must be an INFO field (not FORMAT).
-pub fn snv_vcf_to_tsv(vcf: &Path, vaf_field: &str) -> Result<()> {
-    let mut reader = vcfutils::build_vcf_reader(vcf)?;
-    let header = vcfutils::read_vcf_header(&mut reader)?;
-
-    // Create a buffered writer to stdout
+pub fn convert_snv_vcf_to_tsv(vcf: &Path, options: SnvToolConfig) -> Result<()> {
     let stdout = std::io::stdout();
-    let handle = stdout.lock();
+    let stderr = std::io::stdout();
+    let stats = write_snv_vcf_as_tsv(vcf, options, stdout.lock())?;
+    stats
+        .print_summary(stderr.lock())
+        .map_err(|source| Error::write("stats", source))?;
+    Ok(())
+}
 
-    // let mut writer = csv::WriterBuilder()from_writer(handle);
+/// Write a SNV/MNV/INDEL VCF as mutation TSV.
+///
+/// This function returns an error for multiallelic sites. Normalize with `bcftools norm` before
+/// conversion if multiallelic records are present.
+///
+/// See [`convert_snv_vcf_to_tsv`] for a full description of output filetype
+pub fn write_snv_vcf_as_tsv<W: Write>(
+    vcf: &Path,
+    options: SnvToolConfig,
+    writer: W,
+) -> Result<MutationConversionStats> {
+    let mut reader = vcfutils::build_vcf_reader(vcf)?;
+    let header = vcfutils::read_vcf_header(&mut reader, vcf)?;
+
     let mut writer = csv::WriterBuilder::new()
         .has_headers(true)
         .delimiter(b'\t')
-        .from_writer(handle);
+        .from_writer(writer);
 
-    // TODO: because this function expects purple VCF files where VAF field (PURPLE_AF) is an INFO field not a FORMAT field,
-    // the user doesn't need to supply the tumour sample name.
-    // However for FORMAT fields like non purity adjusted AF or depth (DP) we will need
-    // user to provide tumour ID information
+    let mut stats = MutationConversionStats::default();
 
-    // Iterate through VCF
     for result in reader.records() {
-        let record = result.map_err(|source| Error::ParseVcfRecord {
-            path: vcf.to_owned(),
-            source,
-        })?;
+        stats.total_records += 1;
+        let record = result.map_err(|source| Error::parse_vcf_record(vcf, source))?;
 
-        // Skip non-pass variants
         if !vcfutils::is_pass(&record, &header)? {
             continue;
         }
 
-        // Parse Variant
-        let mutation = crate::vcfutils::record_to_mutation(&record, &header, vaf_field)?;
+        stats.pass_records += 1;
+        let mutation = crate::vcfutils::record_to_mutation(&record, &header, &options.vaf_field)?;
 
-        // Serialize based on mutation serialize trait and write to stdout
-        writer.serialize(mutation).map_err(|err| Error::Write {
-            filetype: "snv-tsv".to_owned(),
-            source: Box::new(err),
-        })?;
+        writer
+            .serialize(mutation)
+            .map_err(|source| Error::write("snv-tsv", source))?;
     }
 
-    // Flush buffer to make sure all mutations are written to stdout
-    let _ = writer.flush();
+    writer
+        .flush()
+        .map_err(|source| Error::flush("snv-tsv", source))?;
 
-    Ok(())
+    Ok(stats)
 }

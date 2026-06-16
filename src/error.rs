@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use thiserror::Error;
 
@@ -16,8 +16,9 @@ pub enum Error {
         source: std::io::Error,
     },
 
-    #[error("failed to parse VCF header")]
+    #[error("failed to parse VCF header: {path}")]
     ParseVcfHeader {
+        path: PathBuf,
         #[source]
         source: std::io::Error,
     },
@@ -43,10 +44,12 @@ pub enum Error {
         source: Box<dyn std::error::Error + Send + Sync + 'static>,
     },
 
-    // #[error("failed to write BEDPE TSV")]
-    // WriteBedpe(#[source] std::io::Error),
-    #[error("failed to flush BEDPE TSV writer")]
-    FlushBedpe(#[source] std::io::Error),
+    #[error("failed to flush: {filetype}")]
+    Flush {
+        filetype: String,
+        #[source]
+        source: std::io::Error,
+    },
 
     #[error("invalid breakend pairing: {0}")]
     InvalidPairing(String),
@@ -101,10 +104,34 @@ impl Error {
         }
     }
 
+    pub(crate) fn write(
+        filetype: impl Into<String>,
+        source: impl std::error::Error + Send + Sync + 'static,
+    ) -> Self {
+        Self::Write {
+            filetype: filetype.into(),
+            source: Box::new(source),
+        }
+    }
+
     pub(crate) fn invalid_info(field: impl Into<String>, message: impl Into<String>) -> Self {
         Self::InvalidInfo {
             field: field.into(),
             message: message.into(),
+        }
+    }
+
+    pub(crate) fn parse_vcf_record(path: &Path, source: std::io::Error) -> Self {
+        Self::ParseVcfRecord {
+            path: path.to_owned(),
+            source,
+        }
+    }
+
+    pub(crate) fn flush(filetype: impl Into<String>, source: std::io::Error) -> Self {
+        Self::Flush {
+            filetype: filetype.into(),
+            source,
         }
     }
 

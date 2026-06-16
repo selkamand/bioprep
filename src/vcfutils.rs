@@ -356,12 +356,15 @@ pub(crate) fn build_vcf_reader(vcf: &Path) -> Result<vcf::io::reader::Reader<Box
 
 pub(crate) fn read_vcf_header(
     reader: &mut vcf::io::reader::Reader<Box<dyn BufRead>>,
+    path: &Path,
 ) -> Result<vcf::Header> {
     match reader.read_header() {
         Ok(header) => Ok(header),
-        Err(e) => Err(Error::ParseVcfHeader { source: e }),
+        Err(source) => Err(Error::ParseVcfHeader {
+            path: path.to_owned(),
+            source,
+        }),
     }
-    // .map_err(|err| ));
 }
 
 // Convert Record to Small mutation type

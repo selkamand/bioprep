@@ -3,14 +3,10 @@
 
 use crate::{
     error::{Error, Result},
-    pubtypes::{self, Breakend, Breakpoint},
+    pubtypes::{self, Breakend, Breakpoint, BreakpointBedpe},
     vcfutils,
 };
-use std::{
-    collections::HashMap,
-    io::{BufWriter, Write},
-    path::Path,
-};
+use std::{collections::HashMap, path::Path};
 
 /// Convert Structural Variant VCF to a BEDPE-like TSV format file
 ///
@@ -46,11 +42,16 @@ pub fn svcf_to_bedpe(vcf: &Path, vaf_field: &str) -> Result<()> {
     let header = vcfutils::read_vcf_header(&mut reader)?;
 
     // Create a buffered writer to stdout
-    let stdout = std::io::stdout().lock();
-    let mut writer = BufWriter::new(stdout);
+    let stdout = std::io::stdout();
+    let handle = stdout.lock();
+
+    let mut writer = csv::WriterBuilder::new()
+        .has_headers(true)
+        .delimiter(b'\t')
+        .from_writer(handle);
 
     // Write header line
-    pubtypes::write_bedpe_header(&mut writer)?;
+    // pubtypes::write_bedpe_header(&mut writer)?;
 
     // Setup iterators
     let mut n_single_breakends: u32 = 0;
@@ -97,9 +98,14 @@ pub fn svcf_to_bedpe(vcf: &Path, vaf_field: &str) -> Result<()> {
         //  - note 'mate_breakend' always occurs earlier in the VCF stream than 'breakend' because of how
         //  the waitlist stashing works.
         let breakpoint: Breakpoint = pubtypes::breakpoint_from_vcf_pair(mate_breakend, breakend);
+        let bedpe: BreakpointBedpe = pubtypes::breakpoint_to_breakpoint_bedpe(breakpoint);
 
-        // Write breakpoint to stdout
-        crate::pubtypes::write_breakpoint_as_bedpe(&breakpoint, &mut writer)?;
+        // Write breakend to stdout using serde serialization
+        // Serialize based on mutation serialize trait and write to stdout
+        writer.serialize(bedpe).map_err(|err| Error::Write {
+            filetype: "bedpev".to_owned(),
+            source: Box::new(err),
+        })?;
 
         // Add tally of paired breakends
         n_proper_breakpoints += 1;
@@ -145,11 +151,17 @@ pub fn svcf_to_breakend_tsv(vcf: &Path, vaf_field: &str) -> Result<()> {
     let header = vcfutils::read_vcf_header(&mut reader)?;
 
     // Create a buffered writer to stdout
-    let stdout = std::io::stdout().lock();
-    let mut writer = BufWriter::new(stdout);
+    let stdout = std::io::stdout();
+    let handle = stdout.lock();
+
+    // let mut writer = csv::WriterBuilder()from_writer(handle);
+    let mut writer = csv::WriterBuilder::new()
+        .has_headers(true)
+        .delimiter(b'\t')
+        .from_writer(handle);
 
     // Write header line
-    pubtypes::write_breakend_tsv_header(&mut writer)?;
+    // pubtypes::write_breakend_tsv_header(&mut writer)?;
 
     for result in reader.records() {
         let record = result.map_err(|source| Error::ParseVcfRecord {
@@ -163,10 +175,20 @@ pub fn svcf_to_breakend_tsv(vcf: &Path, vaf_field: &str) -> Result<()> {
         }
 
         // Parse Breakend
+        // TODO: Add a record_to_simplebreakend function
         let breakend = crate::vcfutils::record_to_breakend(&record, &header, vaf_field)?;
+        let simplebreakend = crate::pubtypes::breakend_to_simple_breakend(&breakend);
 
-        // Write breakend to stdout
-        crate::pubtypes::write_breakend_as_tsv(&breakend, &mut writer)?;
+        // Write breakend to stdout using serde serialization
+        // Serialize based on mutation serialize trait and write to stdout
+        writer
+            .serialize(simplebreakend)
+            .map_err(|err| Error::Write {
+                filetype: "breakend-tsv".to_owned(),
+                source: Box::new(err),
+            })?;
+
+        // crate::pubtypes::write_breakend_as_tsv(&breakend, &mut writer)?;
     }
 
     // Flush buffer to make sure all breakends are written to stdout
@@ -189,17 +211,19 @@ pub fn svcf_to_breakend_tsv(vcf: &Path, vaf_field: &str) -> Result<()> {
 /// 3. ref: reference sequence
 /// 4. alt: alternate sequence
 /// 5. vaf: variant allele frequency of tumour sample (adjusted for purity). Must be an INFO field (not FORMAT).
-
 pub fn snv_vcf_to_tsv(vcf: &Path, vaf_field: &str) -> Result<()> {
     let mut reader = vcfutils::build_vcf_reader(vcf)?;
     let header = vcfutils::read_vcf_header(&mut reader)?;
 
     // Create a buffered writer to stdout
-    let stdout = std::io::stdout().lock();
-    let mut writer = BufWriter::new(stdout);
+    let stdout = std::io::stdout();
+    let handle = stdout.lock();
 
-    // Write header line
-    pubtypes::write_snv_tsv_header(&mut writer)?;
+    // let mut writer = csv::WriterBuilder()from_writer(handle);
+    let mut writer = csv::WriterBuilder::new()
+        .has_headers(true)
+        .delimiter(b'\t')
+        .from_writer(handle);
 
     // TODO: because this function expects purple VCF files where VAF field (PURPLE_AF) is an INFO field not a FORMAT field,
     // the user doesn't need to supply the tumour sample name.
@@ -221,8 +245,11 @@ pub fn snv_vcf_to_tsv(vcf: &Path, vaf_field: &str) -> Result<()> {
         // Parse Variant
         let mutation = crate::vcfutils::record_to_mutation(&record, &header, vaf_field)?;
 
-        // Write snvs to stdout
-        crate::pubtypes::write_mutation_as_tsv(&mutation, &mut writer)?;
+        // Serialize based on mutation serialize trait and write to stdout
+        writer.serialize(mutation).map_err(|err| Error::Write {
+            filetype: "snv-tsv".to_owned(),
+            source: Box::new(err),
+        })?;
     }
 
     // Flush buffer to make sure all mutations are written to stdout

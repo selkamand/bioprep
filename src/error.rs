@@ -40,7 +40,7 @@ pub enum Error {
     Write {
         filetype: String,
         #[source]
-        source: std::io::Error,
+        source: Box<dyn std::error::Error + Send + Sync + 'static>,
     },
 
     // #[error("failed to write BEDPE TSV")]
@@ -68,6 +68,20 @@ pub enum Error {
 
     #[error("integer conversion failed")]
     IntConversion(#[from] std::num::TryFromIntError),
+
+    #[error("failed to open or read TSV: {path}")]
+    ReadTsv {
+        path: PathBuf,
+        #[source]
+        source: csv::Error,
+    },
+
+    #[error("failed to deserialize mutation from TSV file: {path}")]
+    DeserializeMutation {
+        path: PathBuf,
+        #[source]
+        source: csv::Error,
+    },
 }
 
 impl Error {

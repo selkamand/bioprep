@@ -85,11 +85,12 @@ Outputs a TSV with one row per breakend (each side paired breakpoints will have 
 Columns include: 
 
 1. chrom: Chromosome of breakend.
-2. position: 1-based position of breakend as described by POS column in vcf.
-3. vaf: Purity adjusted variant allele frequency supporting breakend (e.g. from PURPLE_VAF info field if `--from purple`).
-4. id: id of breakend.
-5. mateid: id of mate (set to `.` if single breakend)
-6. qual: quality of breakend.
+2. pos: 1-based position of breakend as described by POS column in vcf.
+3. strand: strand inferred from alt allele
+4. vaf: Purity adjusted variant allele frequency supporting breakend (e.g. from PURPLE_VAF info field if `--from purple`).
+5. id: id of breakend.
+6. mateid: id of mate (set to `.` if single breakend)
+7. qual: quality of breakend.
 
 > [!NOTE]
 > Only PASS variants will be included in the result
@@ -132,11 +133,27 @@ that avoid parsing entire files into an object, in favour of iterating through r
 
 ## For Developers 
 
+### Why Serde?
+
+File converters manually deserialise records in input vcf/svcf to a simple struct (e.g. `Breakpoint` or `Mutation`) which has a serde
+serialise derive trait that controls serialisation to the new tabular output format. In plain terms this means output column names (& order) will match struct names (unless renamed using variant attributes  `[serde(rename = "ref")]`) 
+
+The benefit comes when we need to use these standardised output fields in `bioprep tally`. 
+We simply deserialise back into the same intermediary struct - which means we get a guarantee that if our code compiles, the output of the converter will successfully deserialise into that struct.
+    
+
+### Generating files for snapshot testing
+
 Files in testfiles/standardised were generated from root of this project directory with the commands:
 
 ```
 cargo run svcf -i testfiles/tumor_sample.minimal.sv.vcf.gz --from purple --to breakend-tsv > testfiles/standardised/breakends.tsv
 cargo run svcf -i testfiles/tumor_sample.minimal.sv.vcf.gz --from purple --to bedpe > testfiles/standardised/breakpoints.bedpe.tsv
+cargo run vcf -i testfiles/tumor_normal.purple.somatic.vcf.gz --from purple --to tsv > testfiles/standardised/mutations.tsv
 ```
 
-To generate 'standar'
+These were then used to generate tallies using
+
+```
+cargo run tally sbs96 -i testfiles/standardised/mutations.tsv -r testfiles/ref
+```

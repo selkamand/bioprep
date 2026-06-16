@@ -1,20 +1,24 @@
 use crate::error::Error;
 use crate::error::Result;
 
-// A Small Varaitn
+// A Small Variant (SNV / MNV / INDEL)
+
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, PartialEq)]
 pub struct Mutation {
     pub chrom: String,
 
-    // A 1-based VCF style position of the variant
+    /// A 1-based VCF style position of the variant
     pub pos: u64,
 
-    // Reference Sequence
+    /// Reference Sequence
+    #[serde(rename = "ref")]
     pub reference: String,
 
-    // Alternative Sequence
+    /// Alternative Sequence
+    #[serde(rename = "alt")]
     pub alternative: String,
 
-    // A purity adjusted variant allele frequency
+    /// A purity adjusted variant allele frequency
     pub vaf: f32,
 }
 
@@ -30,7 +34,7 @@ pub struct Mutation {
 ///   derived from the VCF `CIPOS` INFO field.
 ///
 /// Strand is inferred from the alt allele content
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct Breakend {
     /// Reference sequence or contig name for this breakend, e.g. `"chr3"`.
     pub chrom: String,
@@ -45,6 +49,7 @@ pub struct Breakend {
     ///
     /// This is a non-inclusive BED-style end coordinate. It is derived from the
     /// VCF 1-based `POS` field and the upper bound of the `CIPOS` INFO field.
+    ///
     pub end: u64,
 
     /// Representative breakend position.
@@ -102,6 +107,61 @@ impl std::fmt::Display for Breakend {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
+pub struct SimpleBreakend {
+    /// Reference sequence or contig name for this breakend, e.g. `"chr3"`.
+    pub chrom: String,
+
+    /// Representative breakend position.
+    ///
+    /// 1-based position from VCF POS field.
+    pub pos: u64,
+
+    /// Orientation of this breakend.
+    ///
+    /// This is inferred from the VCF ALT allele breakend notation.
+    pub strand: Strand,
+
+    /// Variant allele fraction for this breakend.
+    ///
+    /// This is parsed from the configured VAF INFO field, such as
+    /// `PURPLE_AF`.
+    pub vaf: f32,
+
+    /// VCF `ID` for this breakend record.
+    ///
+    /// In paired GRIDSS/PURPLE-style VCFs, the mate breakend should refer to
+    /// this value in its `MATEID` INFO field.
+    pub id: String,
+
+    /// VCF `MATEID` for this breakend record.
+    ///
+    /// This is [`Some`] for paired breakends and [`None`] for single breakends
+    /// or records without a usable `MATEID`.
+    pub mateid: Option<String>,
+
+    /// VCF `QUAL` score for this breakend.
+    ///
+    /// Missing or unparsable quality scores may be represented as `NaN`,
+    /// depending on the parser configuration.
+    pub qual: f32,
+}
+
+/// TODO: We should DEFINITELY just add a new function that parses a record directly to this
+/// SimpleBreakend structure as that will be much more efficient than building up a full 'Breakend'
+/// struct and cloning many of the fields
+pub fn breakend_to_simple_breakend(breakend: &Breakend) -> SimpleBreakend {
+    SimpleBreakend {
+        chrom: breakend.chrom.clone(),
+        pos: breakend.pos + 1, // We don't check this because pos was origininally 1-based anyway
+        strand: breakend.strand.clone(),
+        vaf: breakend.vaf,
+        id: breakend.id.clone(),
+        mateid: breakend.mateid.clone(),
+        qual: breakend.qual,
+    }
+}
+
 pub fn breakend_is_single(breakend: &Breakend) -> bool {
     breakend.mateid.is_none()
 }
@@ -112,6 +172,67 @@ fn _trim_trailing_lowercase_char(mut s: String) {
     }
 }
 
+/// A paired structural-variant breakpoint represented in BEDPE-like form.
+///
+/// The first ten fields follow the common BEDPE column layout:
+///
+/// `chrom1`, `start1`, `end1`, `chrom2`, `start2`, `end2`,
+/// `name`, `score`, `strand1`, `strand2`.
+///
+/// Additional fields record the variant allele fraction and representative
+/// breakend position for each side of the breakpoint:
+///
+/// `vaf1`, `vaf2`, `pos1`, `pos2`.
+///
+/// Coordinates are inherited from [`Breakend`]:
+///
+/// - `start1`, `start2`, `pos1`, and `pos2` are 0-based.
+/// - `end1` and `end2` are non-inclusive BED-style end coordinates.
+/// - `start..end` represents the confidence interval around each breakend.
+///
+/// `name` is produced from the two breakend IDs using
+/// [`Breakpoint::combined_identifier`].
+///
+/// `score` is produced using [`Breakpoint::combined_quality_score`].
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct BreakpointBedpe {
+    pub chrom1: String,
+    pub start1: u64,
+    pub end1: u64,
+    pub chrom2: String,
+    pub start2: u64,
+    pub end2: u64,
+    pub name: String,
+    pub score: f32,
+    pub strand1: Strand,
+    pub strand2: Strand,
+    pub vaf1: f32,
+    pub vaf2: f32,
+    pub pos1: u64,
+    pub pos2: u64,
+}
+
+pub fn breakpoint_to_breakpoint_bedpe(breakpoint: Breakpoint) -> BreakpointBedpe {
+    let name = breakpoint.combined_identifier(IdMergeStrategy::DotSeparate);
+    let score = breakpoint.combined_quality_score(QualityMergeStrategy::First);
+
+    BreakpointBedpe {
+        chrom1: breakpoint.first.chrom,
+        start1: breakpoint.first.start,
+        end1: breakpoint.first.end,
+        chrom2: breakpoint.second.chrom,
+        start2: breakpoint.second.start,
+        end2: breakpoint.second.end,
+        name,
+        score,
+        strand1: breakpoint.first.strand,
+        strand2: breakpoint.second.strand,
+        vaf1: breakpoint.first.vaf,
+        vaf2: breakpoint.second.vaf,
+        pos1: breakpoint.first.pos,
+        pos2: breakpoint.second.pos,
+    }
+}
 /// Genomic breaks represented by the two ends of the genome that got stitched together post-break
 pub struct Breakpoint {
     pub first: Breakend,
@@ -177,7 +298,7 @@ pub fn write_breakpoint_as_bedpe(
     )
     .map_err(|err| Error::Write {
         filetype: "BEDPE tsv".to_owned(),
-        source: err,
+        source: Box::new(err),
     })?;
 
     Ok(())
@@ -191,7 +312,7 @@ pub fn write_bedpe_header(writer: &mut impl std::io::Write) -> Result<()> {
 
     .map_err(|err| Error::Write {
         filetype: "BEDPE".to_owned(),
-        source: err,
+        source: Box::new(err),
     })?;
 
     Ok(())
@@ -211,7 +332,7 @@ pub fn write_breakend_as_tsv(breakend: &Breakend, writer: &mut impl std::io::Wri
     )
     .map_err(|err| Error::Write {
         filetype: "BEDPE tsv".to_owned(),
-        source: err,
+        source: Box::new(err),
     })?;
 
     Ok(())
@@ -220,7 +341,7 @@ pub fn write_breakend_as_tsv(breakend: &Breakend, writer: &mut impl std::io::Wri
 pub fn write_breakend_tsv_header(writer: &mut impl std::io::Write) -> Result<()> {
     writeln!(writer, "chrom\tpos\tvaf\tid\tmateid\tqual").map_err(|err| Error::Write {
         filetype: "breakend-tsv".to_owned(),
-        source: err,
+        source: Box::new(err),
     })?;
 
     Ok(())
@@ -259,31 +380,8 @@ pub(crate) fn breakpoint_from_vcf_pair(earlier: Breakend, later: Breakend) -> Br
     }
 }
 
-pub fn write_snv_tsv_header(writer: &mut impl std::io::Write) -> Result<()> {
-    writeln!(writer, "chrom\tpos\tref\talt\tvaf").map_err(|err| Error::Write {
-        filetype: "snv-tsv".to_owned(),
-        source: err,
-    })?;
-
-    Ok(())
-}
-
-pub fn write_mutation_as_tsv(mutation: &Mutation, writer: &mut impl std::io::Write) -> Result<()> {
-    writeln!(
-        writer,
-        "{}\t{}\t{}\t{}\t{}",
-        mutation.chrom, mutation.pos, mutation.reference, mutation.alternative, mutation.vaf,
-    )
-    .map_err(|err| Error::Write {
-        filetype: "snv-tsv".to_owned(),
-        source: err,
-    })?;
-
-    Ok(())
-}
-
 // Basic Strand Enum
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub enum Strand {
     Plus,
     Minus,

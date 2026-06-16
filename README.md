@@ -41,7 +41,7 @@ When CIPOS field is not found we will assume the break is precisely located at P
 > Single breakends are excluded.
 
 ```
-bioprep svcf -i <svcf> --from purple --to bedpe
+bioprep convert svcf -i <svcf> --from purple --to bedpe
 ```
 
 Outputs a BEDPE-like format data with one row per breakpoint including the following columns: 
@@ -77,7 +77,7 @@ Plus additional columns: (downstream tools like bedtools allow any number of add
 ### Breakend TSV
 
 ```
-bioprep svcf -i <vcf> --from purple --to breakend-tsv
+bioprep convert svcf -i <vcf> --from purple --to breakend-tsv
 ```
 
 Outputs a TSV with one row per breakend (each side paired breakpoints will have their own row). 
@@ -103,7 +103,7 @@ Tumour-normal variant callers like Sage produce a VCF file describing SNVs, MNVs
 ### TSV 
 
 ```
-bioprep vcf -i <vcf> --from purple --to tsv
+bioprep convert vcf -i <vcf> --from purple --to tsv
 ```
 
 Outputs a TSV with one row per small mutation Columns include: 
@@ -122,6 +122,17 @@ Outputs a TSV with one row per small mutation Columns include:
 > We recommend normalising with `bcftools norm --multiallelic - --check-ref e -f ${reference_genome_fasta} ${vcf}` 
 > before converting to a TSV with this script
 
+
+## Counting Types of Mutations
+
+Once biological file formats are converted into tabular formats, 
+we can feed them into `bioprep tally`  to classify mutations into different types and count how often each appears.
+
+For example to classify single base mutations into 96 different types based on base change and trinucleotide context:
+
+```
+bioprep tally sbs96 -i <mutation_tsv> -r <reference_genome.fasta>
+```
 
 ## Performance
 
@@ -147,9 +158,9 @@ We simply deserialise back into the same intermediary struct - which means we ge
 Files in testfiles/standardised were generated from root of this project directory with the commands:
 
 ```
-cargo run svcf -i testfiles/tumor_sample.minimal.sv.vcf.gz --from purple --to breakend-tsv > testfiles/standardised/breakends.tsv
-cargo run svcf -i testfiles/tumor_sample.minimal.sv.vcf.gz --from purple --to bedpe > testfiles/standardised/breakpoints.bedpe.tsv
-cargo run vcf -i testfiles/tumor_normal.purple.somatic.vcf.gz --from purple --to tsv > testfiles/standardised/mutations.tsv
+cargo run convert svcf -i testfiles/tumor_sample.minimal.sv.vcf.gz --from purple --to breakend-tsv > testfiles/standardised/breakends.tsv
+cargo run convert svcf -i testfiles/tumor_sample.minimal.sv.vcf.gz --from purple --to bedpe > testfiles/standardised/breakpoints.bedpe.tsv
+cargo run convert vcf -i testfiles/tumor_normal.purple.somatic.vcf.gz --from purple --to tsv > testfiles/standardised/mutations.tsv
 ```
 
 These were then used to generate tallies using

@@ -54,6 +54,21 @@ struct Cli {
 #[derive(Subcommand)]
 #[command()]
 enum Commands {
+    /// Perform Common file format conversions
+    Convert {
+        #[command(subcommand)]
+        input: ConversionInputCommands,
+    },
+
+    /// Tally variants into mutational signature classification schemes
+    Tally {
+        #[command(subcommand)]
+        scheme: ClassificationSchemes,
+    },
+}
+
+#[derive(Subcommand)]
+enum ConversionInputCommands {
     /// Convert svcf file to other file formats
     Svcf {
         /// Path to a structural variant vcf
@@ -82,12 +97,6 @@ enum Commands {
         #[arg(long, value_enum, value_name = "filetype")]
         to: SnvOutputTypes,
     },
-
-    /// Tally variants into mutational signature classification schemes
-    Tally {
-        #[command(subcommand)]
-        scheme: ClassificationSchemes,
-    },
 }
 
 #[derive(Subcommand)]
@@ -95,7 +104,7 @@ enum ClassificationSchemes {
     /// Tally SNVs into SBS96 trinucleotide classes
     Sbs96 {
         /// Path to a standardised bioprep SNV TSV
-        #[arg(long = "snv-tsv", value_name = "tsv", value_hint = ValueHint::FilePath)]
+        #[arg(short = 'i', long = "input", value_name = "mutation tsv", value_hint = ValueHint::FilePath)]
         snv_tsv: PathBuf,
 
         /// Reference genome FASTA used to fetch trinucleotide context
@@ -105,7 +114,7 @@ enum ClassificationSchemes {
     /// Tally SNVs into SBS6 substitution classes
     Sbs6 {
         /// Path to a standardised bioprep SNV TSV
-        #[arg(long = "snv-tsv", value_name = "tsv", value_hint = ValueHint::FilePath)]
+        #[arg(short = 'i', long = "input", value_name = "mutation tsv", value_hint = ValueHint::FilePath)]
         snv_tsv: PathBuf,
 
         /// Reference genome FASTA used to fetch trinucleotide context
@@ -115,7 +124,7 @@ enum ClassificationSchemes {
     /// Validate SV32 inputs. Classification rules are not implemented yet.
     Sv32 {
         /// Path to a standardised bioprep BEDPE-like TSV
-        #[arg(long = "bedpe", value_name = "tsv", value_hint = ValueHint::FilePath)]
+        #[arg(short = 'i', long = "input", value_name = "bedpe-tsv", value_hint = ValueHint::FilePath)]
         bedpe: PathBuf,
 
         /// Reference genome FASTA
@@ -128,33 +137,44 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        // SV conversions
-        Commands::Svcf { svcf, from, to } => {
-            let vaf_field = match from {
-                SvcfTypes::Purple => "PURPLE_AF",
-            };
+        Commands::Convert { input } => match input {
+            ConversionInputCommands::Svcf { svcf, from, to } => {
+                let vaf_field = match from {
+                    SvcfTypes::Purple => "PURPLE_AF",
+                };
 
-            match to {
-                SvOutputTypes::Bedpe => svcf_to_bedpe(&svcf, vaf_field)?,
-                SvOutputTypes::BreakendTsv => svcf_to_breakend_tsv(&svcf, vaf_field)?,
-            };
-        }
-
-        // VCF conversions
-        Commands::Vcf { vcf, from, to } => {
-            let vaf_field = match from {
-                SnvVcfTypes::Purple => "PURPLE_AF",
-            };
-            let depth_field = match from {
-                SnvVcfTypes::Purple => "DP",
-            };
-            let vaf_unadjusted_field = match from {
-                SnvVcfTypes::Purple => "AF",
-            };
-            match to {
-                SnvOutputTypes::Tsv => snv_vcf_to_tsv(&vcf, vaf_field)?,
+                match to {
+                    SvOutputTypes::Bedpe => svcf_to_bedpe(&svcf, vaf_field)?,
+                    SvOutputTypes::BreakendTsv => svcf_to_breakend_tsv(&svcf, vaf_field)?,
+                };
             }
-        }
+
+            ConversionInputCommands::Vcf { vcf, from, to } => {
+                let vaf_field = match from {
+                    SnvVcfTypes::Purple => "PURPLE_AF",
+                };
+                let _depth_field = match from {
+                    SnvVcfTypes::Purple => "DP",
+                };
+                let _vaf_unadjusted_field = match from {
+                    SnvVcfTypes::Purple => "AF",
+                };
+                match to {
+                    SnvOutputTypes::Tsv => snv_vcf_to_tsv(&vcf, vaf_field)?,
+                }
+            }
+        },
+        Commands::Tally { scheme } => match scheme {
+            ClassificationSchemes::Sbs96 { snv_tsv, reference } => {
+                bioprep::tally::tally_sbs96(&snv_tsv, &reference)?;
+            }
+            ClassificationSchemes::Sbs6 { snv_tsv, reference } => {
+                todo!("No implementation for SBS6 tallying yet")
+            }
+            ClassificationSchemes::Sv32 { bedpe, reference } => {
+                todo!("No implementation for Sv32 tallying yet")
+            }
+        },
     };
 
     Ok(())

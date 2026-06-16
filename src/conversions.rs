@@ -54,11 +54,14 @@ pub fn svcf_to_bedpe(vcf: &Path, vaf_field: &str) -> Result<()> {
 
     // Setup iterators
     let mut n_single_breakends: u32 = 0;
-    let mut n_paired_breakends: u32 = 0;
+    let mut n_proper_breakpoints: u32 = 0;
+    let mut total_breakends_before_filtering: u32 = 0;
+    let mut total_breakends_after_filtering: u32 = 0;
 
     // Setup a hashmap waitlist which breakends will be stashed in until we find their mate
     let mut waitlist: HashMap<String, Breakend> = HashMap::new();
     for result in reader.records() {
+        total_breakends_before_filtering += 1;
         let record = result.map_err(|source| Error::ParseVcfRecord {
             path: vcf.to_owned(),
             source,
@@ -68,11 +71,11 @@ pub fn svcf_to_bedpe(vcf: &Path, vaf_field: &str) -> Result<()> {
         if !vcfutils::is_pass(&record, &header)? {
             continue;
         }
-
+        total_breakends_after_filtering += 1;
         // Parse Breakend
         let breakend = crate::vcfutils::record_to_breakend(&record, &header, vaf_field)?;
 
-        // Skip the rest of loop if its a single breakend
+        // Skip the rest of loop if its a single breaken
         let Some(mateid) = &breakend.mateid else {
             n_single_breakends += 1;
             continue;
@@ -99,7 +102,7 @@ pub fn svcf_to_bedpe(vcf: &Path, vaf_field: &str) -> Result<()> {
         crate::pubtypes::write_breakpoint_as_bedpe(&breakpoint, &mut writer)?;
 
         // Add tally of paired breakends
-        n_paired_breakends += 1;
+        n_proper_breakpoints += 1;
     }
 
     // Flush buffer to make sure all breapoints are written to stdout
@@ -108,11 +111,17 @@ pub fn svcf_to_bedpe(vcf: &Path, vaf_field: &str) -> Result<()> {
     // Count number of breakends that were lift in waitlist (we never found their mate in the VCF)
     let n_unmatched_breakends = waitlist.len();
     // Check how many single breakends we had left
-    eprintln!("Wrote {n_paired_breakends} paired breakends to BEDPE file");
-    eprintln!("Found {n_single_breakends} single breakends (no MATEID)");
+    eprintln!("\n=============\nSummary\n=============");
+    eprintln!("{total_breakends_before_filtering} total breakends in file");
+    eprintln!("{total_breakends_after_filtering} breakends after PASS-filtering");
     eprintln!(
-        "Found {n_unmatched_breakends} unmatched breakends (had MATEID but mate not in VCF after filtering)"
+        "{n_proper_breakpoints} proper breakpoints (pairs of breakends that both survived filtering)"
     );
+    eprintln!("{n_single_breakends} single breakends (no MATEID)");
+    eprintln!(
+        "{n_unmatched_breakends} unmatched breakends (had MATEID but mate not in VCF after filtering)"
+    );
+    eprintln!("\nOnly the {n_proper_breakpoints} proper breakpoints were output");
 
     Ok(())
 }

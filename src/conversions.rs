@@ -366,3 +366,77 @@ pub fn write_snv_vcf_as_tsv<W: Write>(
 
     Ok(stats)
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::config::{SnvTool, SvTool, configure_for_snv_tool, configure_for_sv_tool};
+
+    use super::*;
+    use std::path::PathBuf;
+
+    fn fixture(path: &str) -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(path)
+    }
+
+    fn read_fixture(path: &str) -> String {
+        std::fs::read_to_string(fixture(path)).expect("fixture should be readable")
+    }
+
+    #[test]
+    fn writes_snv_vcf_as_tsv() {
+        let mut out = Vec::new();
+        let input = fixture("testfiles/tumor_normal.purple.somatic.vcf.gz");
+
+        let stats = write_snv_vcf_as_tsv(&input, configure_for_snv_tool(SnvTool::Purple), &mut out)
+            .expect("SNV VCF conversion should succeed");
+
+        assert_eq!(
+            String::from_utf8(out).expect("output should be valid UTF-8"),
+            read_fixture("testfiles/standardised/mutations.tsv")
+        );
+        assert_eq!(stats.pass_records, 393);
+    }
+
+    #[test]
+    fn writes_svcf_as_breakend_tsv() {
+        let mut out = Vec::new();
+        let input = fixture("testfiles/tumor_sample.minimal.sv.vcf.gz");
+
+        let stats =
+            write_svcf_as_breakend_tsv(&input, configure_for_sv_tool(SvTool::Purple), &mut out)
+                .expect("SV VCF breakend conversion should succeed");
+
+        assert_eq!(
+            String::from_utf8(out).expect("output should be valid UTF-8"),
+            read_fixture("testfiles/standardised/breakends.tsv")
+        );
+        assert_eq!(stats.total_breakends_after_filtering, 162);
+    }
+
+    #[test]
+    fn writes_svcf_as_bedpe() {
+        let mut out = Vec::new();
+        let input = fixture("testfiles/tumor_sample.minimal.sv.vcf.gz");
+
+        let stats = write_svcf_as_bedpe(&input, configure_for_sv_tool(SvTool::Purple), &mut out)
+            .expect("SV VCF BEDPE conversion should succeed");
+
+        assert_eq!(
+            String::from_utf8(out).expect("output should be valid UTF-8"),
+            read_fixture("testfiles/standardised/breakpoints.bedpe.tsv")
+        );
+        assert_eq!(stats.proper_breakpoints, 75);
+        assert_eq!(stats.single_breakends, 12);
+        assert_eq!(stats.unmatched_breakends, 0);
+    }
+
+    #[test]
+    fn missing_input_file_returns_error() {
+        let mut out = Vec::new();
+        let input = fixture("testfiles/does-not-exist.vcf");
+        let err = write_snv_vcf_as_tsv(&input, configure_for_snv_tool(SnvTool::Purple), &mut out)
+            .expect_err("missing input should fail");
+
+        assert!(matches!(err, Error::FileNotFound(_)));
+    }
+}

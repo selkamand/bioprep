@@ -128,3 +128,15 @@ During this early phase of development, we are more focused on ease of future ex
 
 We do not guarantee a maximum memory footprint for any filetype conversions, however where possible we choose implementation strategies
 that avoid parsing entire files into an object, in favour of iterating through records and streaming converted output.
+
+
+## For Developers 
+
+Files in testfiles/standardised were generated from root of this project directory with the commands:
+
+```
+cargo run svcf -i testfiles/tumor_sample.minimal.sv.vcf.gz --from purple --to breakend-tsv > testfiles/standardised/breakends.tsv
+cargo run svcf -i testfiles/tumor_sample.minimal.sv.vcf.gz --from purple --to bedpe > testfiles/standardised/breakpoints.bedpe.tsv
+```
+
+To generate 'standar'

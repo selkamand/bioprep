@@ -69,7 +69,7 @@ enum Commands {
         scheme: ClassificationSchemes,
     },
 
-    /// Compute statistics that may include measures beyond simple tallies into classification
+    /// Compute sets of statistics
     /// schemes
     Stats {
         // schemes
@@ -118,6 +118,18 @@ enum ConversionInputCommands {
 
 #[derive(Subcommand)]
 enum ClassificationSchemes {
+    /// Tally single base changes into transitions / transversions
+    Titv {
+        /// Path to a standardised bioprep SNV TSV
+        #[arg(short = 'i', long = "input", value_name = "mutation tsv", value_hint = ValueHint::FilePath)]
+        snv_tsv: PathBuf,
+    },
+    /// Tally small mutation types (snv, doublet, mnv, deletion, insertion)
+    Smallmuts {
+        /// Path to a standardised bioprep SNV TSV
+        #[arg(short = 'i', long = "input", value_name = "mutation tsv", value_hint = ValueHint::FilePath)]
+        snv_tsv: PathBuf,
+    },
     /// Tally SNVs into SBS96 trinucleotide classes
     Sbs96 {
         /// Path to a standardised bioprep SNV TSV
@@ -177,8 +189,7 @@ enum PredictionModels {
 
 #[derive(Subcommand)]
 enum StatSets {
-    /// Compute a set of measures related to Genome instability, including Autosomal LOH and SV
-    /// Count
+    /// Compute measures of genome instability including autosomal LOH and SV burden
     GenomeInstability {
         /// Path to a standardised bioprep SNV TSV
         #[arg(short = 'i', long = "input", value_name = "mutations.tsv", value_hint = ValueHint::FilePath)]
@@ -223,6 +234,15 @@ fn main() -> Result<()> {
                 reference: _,
             } => {
                 todo!("No implementation for Sv32 tallying yet")
+            }
+            ClassificationSchemes::Titv { snv_tsv } => {
+                bioprep::tally::tally_titv(snv_tsv.as_path(), std::io::stdout().lock())?;
+            }
+            ClassificationSchemes::Smallmuts { snv_tsv } => {
+                bioprep::tally::tally_small_mutation_types(
+                    snv_tsv.as_path(),
+                    std::io::stdout().lock(),
+                )?;
             }
         },
         Commands::Stats { statset } => match statset {

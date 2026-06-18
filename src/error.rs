@@ -85,6 +85,18 @@ pub enum Error {
         #[source]
         source: csv::Error,
     },
+    #[error("Failed to convert bioprep mutation to seqlib equivalent. Problematic field: {field}")]
+    InvalidSequenceForConversion {
+        field: String,
+        #[source]
+        source: seqlib::error::Error,
+    },
+
+    #[error("Failed to convert bioprep mutation to seqlib equivalent. Problematic field: position")]
+    InvalidPositionForConversion {
+        #[source]
+        source: seqlib::error::Error,
+    },
 }
 
 impl Error {

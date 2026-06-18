@@ -68,6 +68,20 @@ enum Commands {
         #[command(subcommand)]
         scheme: ClassificationSchemes,
     },
+
+    /// Compute statistics that may include measures beyond simple tallies into classification
+    /// schemes
+    Stats {
+        // schemes
+        #[command(subcommand)]
+        statset: StatSets,
+    },
+
+    /// Predict biological properties of a tumour
+    Predict {
+        #[command(subcommand)]
+        model: PredictionModels,
+    },
 }
 
 #[derive(Subcommand)]
@@ -136,6 +150,41 @@ enum ClassificationSchemes {
     },
 }
 
+#[derive(Subcommand)]
+enum PredictionModels {
+    /// Predicts whether patient has a P53 dysfunction
+    P53detect {
+        /// Path to a standardised bioprep SNV TSV
+        #[arg(short = 'i', long = "input", value_name = "instability_stats.tsv", value_hint = ValueHint::FilePath)]
+        instability_stats: PathBuf,
+
+        // Model weights
+        #[arg(short = 'w', long = "weights", value_name = "weights.tsv", value_hint = ValueHint::FilePath)]
+        weights: PathBuf,
+    },
+
+    /// Predicts whether a haematological cancer patient has an ETV6 disruption based on mutational signature analysis
+    ETV6detect {
+        /// Path to a standardised bioprep SNV TSV
+        #[arg(short = 'i', long = "input", value_name = "features.tsv", value_hint = ValueHint::FilePath)]
+        features: PathBuf,
+
+        // Model weights
+        #[arg(short = 'w', long = "weights", value_name = "weights.tsv", value_hint = ValueHint::FilePath)]
+        weights: PathBuf,
+    },
+}
+
+#[derive(Subcommand)]
+enum StatSets {
+    /// Compute a set of measures related to Genome instability, including Autosomal LOH and SV
+    /// Count
+    GenomeInstability {
+        /// Path to a standardised bioprep SNV TSV
+        #[arg(short = 'i', long = "input", value_name = "mutations.tsv", value_hint = ValueHint::FilePath)]
+        mutations: PathBuf,
+    },
+}
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -145,27 +194,52 @@ fn main() -> Result<()> {
                 let config = bioprep::config::configure_for_sv_tool(from);
 
                 match to {
-                    SvOutputTypes::Bedpe => convert_svcf_to_bedpe(&svcf, config)?,
-                    SvOutputTypes::BreakendTsv => convert_svcf_to_breakend_tsv(&svcf, config)?,
+                    SvOutputTypes::Bedpe => convert_svcf_to_bedpe(svcf.as_path(), config)?,
+                    SvOutputTypes::BreakendTsv => {
+                        convert_svcf_to_breakend_tsv(svcf.as_path(), config)?
+                    }
                 };
             }
 
             ConversionInputCommands::Vcf { vcf, from, to } => {
                 let config = configure_for_snv_tool(from);
                 match to {
-                    SnvOutputTypes::Tsv => convert_snv_vcf_to_tsv(&vcf, config)?,
+                    SnvOutputTypes::Tsv => convert_snv_vcf_to_tsv(vcf.as_path(), config)?,
                 }
             }
         },
         Commands::Tally { scheme } => match scheme {
             ClassificationSchemes::Sbs96 { snv_tsv, reference } => {
-                bioprep::tally::tally_sbs96(&snv_tsv, &reference)?;
+                bioprep::tally::tally_sbs96(snv_tsv.as_path(), reference.as_path())?;
             }
-            ClassificationSchemes::Sbs6 { snv_tsv, reference } => {
+            ClassificationSchemes::Sbs6 {
+                snv_tsv: _,
+                reference: _,
+            } => {
                 todo!("No implementation for SBS6 tallying yet")
             }
-            ClassificationSchemes::Sv32 { bedpe, reference } => {
+            ClassificationSchemes::Sv32 {
+                bedpe: _,
+                reference: _,
+            } => {
                 todo!("No implementation for Sv32 tallying yet")
+            }
+        },
+        Commands::Stats { statset } => match statset {
+            StatSets::GenomeInstability { mutations: _ } => {
+                todo!("No implementation for genome instability stats")
+            }
+        },
+        Commands::Predict { model } => match model {
+            PredictionModels::P53detect {
+                instability_stats: _,
+                weights: _,
+            } => todo!("P53detect model is not yet implemented"),
+            PredictionModels::ETV6detect {
+                features: _,
+                weights: _,
+            } => {
+                todo!("ETV6detect model not yet implemented")
             }
         },
     };

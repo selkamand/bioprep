@@ -70,7 +70,6 @@ enum Commands {
     },
 
     /// Compute sets of statistics
-    /// schemes
     Stats {
         // schemes
         #[command(subcommand)]

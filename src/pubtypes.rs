@@ -1,8 +1,4 @@
-use crate::error::Error;
-use crate::error::Result;
-
-// A Small Variant (SNV / MNV / INDEL)
-
+/// A Small Variant (SNV / MNV / INDEL)
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone, PartialEq)]
 pub struct Mutation {
     pub chrom: String,

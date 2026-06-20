@@ -1,14 +1,11 @@
 //! Assorted utilities for working with VCF files
 
-use crate::error;
 use crate::error::Error;
 use crate::error::Result;
-use crate::pubtypes;
 use crate::pubtypes::Breakend;
 use crate::pubtypes::Mutation;
 use crate::pubtypes::Strand;
 use noodles::vcf;
-use noodles::vcf::variant::Record;
 use noodles::vcf::variant::record::AlternateBases;
 use noodles::vcf::variant::record::Filters;
 use noodles::vcf::variant::record::Ids;

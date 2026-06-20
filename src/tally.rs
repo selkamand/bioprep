@@ -2,18 +2,12 @@
 
 use crate::{
     error::{Error, Result},
-    io::read_mutations_tsv,
+    io::{create_tsv_writer, read_mutations_tsv, serialize_object_to_writer},
     pubtypes::Mutation,
     seqlibutils,
     tallytypes::{TallySbs6, TallySmallMutationType, TallyTiTv},
 };
-use seqlib::{
-    base::{Base, ChemClass, DnaBase},
-    context::{ContextWindow, Orientation},
-    coord::Pos,
-    mutation::{DnaSmallMutation, MutationWithContext, SmallMutationType},
-    sequence::{BaseSliceExt, DnaSeq},
-};
+use seqlib::mutation::SmallMutationType;
 use std::{
     io::{BufWriter, Write},
     path::Path,
@@ -25,21 +19,22 @@ pub fn tally_titv<W: Write>(snv_tsv: &Path, writer: W) -> Result<()> {
     // Create reader
     let mut rdr = read_mutations_tsv(snv_tsv)?;
 
-    let mut writer = csv::WriterBuilder::new()
-        .has_headers(true)
-        .delimiter(b'\t')
-        .from_writer(writer);
+    // Create writer
+    let writer = create_tsv_writer(writer);
 
     // Initialise counter
     let mut tally = TallyTiTv::default();
 
-    // Tally TiTv
+    // Loop through mutation file
     for result in rdr.deserialize() {
+        // Deserialize into mutation class from this crate
         let mutation_bioprep: Mutation = result.map_err(|source| Error::DeserializeMutation {
             path: snv_tsv.to_owned(),
             source,
         })?;
 
+        // Convert to a seqlib SmallMutation type to get
+        // convenient mutation classification
         let mutation = seqlibutils::mutation_to_seqlib_mutation(mutation_bioprep)?;
 
         match mutation.titv() {
@@ -51,11 +46,8 @@ pub fn tally_titv<W: Write>(snv_tsv: &Path, writer: W) -> Result<()> {
         };
     }
 
-    // Print to stdout
-
-    writer
-        .serialize(tally)
-        .map_err(|source| Error::write("tally-titv", source))?;
+    // Serialize object to writer
+    serialize_object_to_writer(writer, tally, "Tally (TiTv)")?;
 
     Ok(())
 }
@@ -65,25 +57,25 @@ pub fn tally_sbs6<W: Write>(snv_tsv: &Path, writer: W) -> Result<()> {
     // Create reader
     let mut rdr = read_mutations_tsv(snv_tsv)?;
 
-    let mut writer = csv::WriterBuilder::new()
-        .has_headers(true)
-        .delimiter(b'\t')
-        .from_writer(writer);
+    // Create writer
+    let mut writer = create_tsv_writer(writer);
 
     // Initialise counter
-    let mut tally = TallySbs6::default();
+    let tally = TallySbs6::default();
 
-    // Tally TiTv
+    // Loop through mutation file
     for result in rdr.deserialize() {
+        // Deserialize into mutation class from this crate
         let mutation_bioprep: Mutation = result.map_err(|source| Error::DeserializeMutation {
             path: snv_tsv.to_owned(),
             source,
         })?;
 
+        // Convert
         let mutation = seqlibutils::mutation_to_seqlib_mutation(mutation_bioprep)?;
-        //
-        // //TODO: replace this with a mutaiton class
+        //TODO: add actual SBS6 mutation type classification
 
+        todo!("Add actual SBS6 mutation type classification")
         // match mutation.titv() {
         //     Some(val) => match val {
         //         seqlib::mutation::TiTv::Transition => tally.transition += 1,
@@ -97,7 +89,7 @@ pub fn tally_sbs6<W: Write>(snv_tsv: &Path, writer: W) -> Result<()> {
 
     writer
         .serialize(tally)
-        .map_err(|source| Error::write("tally-titv", source))?;
+        .map_err(|source| Error::write("tally-sbs6", source))?;
 
     Ok(())
 }
@@ -143,7 +135,7 @@ pub fn tally_small_mutation_types<W: Write>(snv_tsv: &Path, writer: W) -> Result
 
 /// Classify Single base substitutions into 96 different types
 /// based on base change and and trinucleotide context of mutated base.
-pub fn tally_sbs96(snv_tsv: &Path, reference: &Path) -> Result<()> {
+pub fn tally_sbs96(snv_tsv: &Path, _reference: &Path) -> Result<()> {
     // Opening a reader to the SNV TSV file
     let mut mutation_rdr = csv::ReaderBuilder::new()
         .delimiter(b'\t')
@@ -156,11 +148,11 @@ pub fn tally_sbs96(snv_tsv: &Path, reference: &Path) -> Result<()> {
 
     // Create writer (to stdout)
     let stdout = std::io::stdout().lock();
-    let mut writer = BufWriter::new(stdout);
+    let _writer = BufWriter::new(stdout);
 
     // Iterate through tsv
     for result in mutation_rdr.deserialize() {
-        let mutation: Mutation = result.map_err(|source| Error::DeserializeMutation {
+        let _mutation: Mutation = result.map_err(|source| Error::DeserializeMutation {
             path: snv_tsv.to_owned(),
             source,
         })?;

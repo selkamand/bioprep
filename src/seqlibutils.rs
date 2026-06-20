@@ -1,10 +1,10 @@
 use crate::error::Error;
 use crate::error::Result;
-use seqlib::{mutation::DnaSmallMutation, sequence::IupacDnaSeq};
+use seqlib::{mutation::IupacDnaSmallMutation, sequence::IupacDnaSeq};
 
 pub fn mutation_to_seqlib_mutation(
     mutation: crate::pubtypes::Mutation,
-) -> Result<DnaSmallMutation> {
+) -> Result<IupacDnaSmallMutation> {
     let alt_sequence = IupacDnaSeq::new(&mutation.alternative).map_err(|source| {
         Error::InvalidSequenceForConversion {
             field: "alternative".to_owned(),
@@ -22,11 +22,12 @@ pub fn mutation_to_seqlib_mutation(
     let pos = seqlib::coord::Pos::try_from(mutation.pos)
         .map_err(|source| Error::InvalidPositionForConversion { source })?;
 
-    Ok(DnaSmallMutation::new(
+    Ok(IupacDnaSmallMutation::new(
         mutation.chrom,
         pos,
         ref_sequence,
         alt_sequence,
+        Some(seqlib::coord::Strand::Positive),
         false,
         true,
     ))

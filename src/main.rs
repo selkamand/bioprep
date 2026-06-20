@@ -149,7 +149,7 @@ enum ClassificationSchemes {
         #[arg(short = 'r', long = "reference", value_name = "fasta", value_hint = ValueHint::FilePath)]
         reference: PathBuf,
     },
-    /// Validate SV32 inputs. Classification rules are not implemented yet.
+    /// Tally structural variants into SV32 substitution classes
     Sv32 {
         /// Path to a standardised bioprep BEDPE-like TSV
         #[arg(short = 'i', long = "input", value_name = "bedpe-tsv", value_hint = ValueHint::FilePath)]

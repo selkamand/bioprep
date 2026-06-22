@@ -7,14 +7,19 @@ use crate::{
     seqlibutils,
     tallytypes::{TallySbs6, TallySmallMutationType, TallyTiTv},
 };
-use seqlib::{base::DnaBase, mutation::SmallMutationType, sbs::DnaSingleBaseSubstitution};
+use seqlib::{
+    base::{ConcreteBase, DnaBase},
+    mutation::SmallMutationType,
+    sbs::{DnaSingleBaseSubstitution, SingleBaseSubstitution},
+};
 use std::{
     io::{BufWriter, Write},
     path::Path,
 };
 
-/// Tally the number of transitions vs transversions
-/// and print result to stdout
+/// Tally the number of transitions vs transversions.
+/// Only considers Single Base Substititions (but can be RNA or DNA)
+/// and write result to writer
 pub fn tally_titv<W: Write>(snv_tsv: &Path, writer: W) -> Result<()> {
     // Create reader
     let mut rdr = read_mutations_tsv(snv_tsv)?;
@@ -37,12 +42,15 @@ pub fn tally_titv<W: Write>(snv_tsv: &Path, writer: W) -> Result<()> {
         // convenient mutation classification
         let mutation = seqlibutils::mutation_to_seqlib_mutation(mutation_bioprep)?;
 
-        match mutation.titv() {
-            Some(val) => match val {
-                seqlib::mutation::TiTv::Transition => tally.transition += 1,
-                seqlib::mutation::TiTv::Transversion => tally.transition += 1,
-            },
-            None => continue,
+        // Convert to a Single Base substition (DNA or RNA)
+        let sbs = match SingleBaseSubstitution::<dyn ConcreteBase>::try_from(&mutation) {
+            Ok(sbs) => sbs,
+            Err(_) => continue,
+        };
+
+        match sbs.titv() {
+            seqlib::mutation::TiTv::Transition => tally.transition += 1,
+            seqlib::mutation::TiTv::Transversion => tally.transversion += 1,
         };
     }
 

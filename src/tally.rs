@@ -2,7 +2,10 @@
 
 use crate::{
     error::{Error, Result},
-    io::{create_tsv_writer, read_mutations_tsv, serialize_object_to_writer},
+    io::{
+        create_tsv_writer, create_versioned_tsv_writer, read_mutations_tsv,
+        serialize_object_to_writer,
+    },
     pubtypes::Mutation,
     seqlibutils,
     tallytypes::{TallySbs6, TallySmallMutationType, TallyTiTv},
@@ -18,14 +21,11 @@ use std::{
 };
 
 /// Tally the number of transitions vs transversions.
-/// Only considers Single Base Substititions (but can be RNA or DNA)
+/// Only considers Single Base Substititions (DNA)
 /// and write result to writer
 pub fn tally_titv<W: Write>(snv_tsv: &Path, writer: W) -> Result<()> {
     // Create reader
     let mut rdr = read_mutations_tsv(snv_tsv)?;
-
-    // Create writer
-    let writer = create_tsv_writer(writer);
 
     // Initialise counter
     let mut tally = TallyTiTv::default();
@@ -43,7 +43,7 @@ pub fn tally_titv<W: Write>(snv_tsv: &Path, writer: W) -> Result<()> {
         let mutation = seqlibutils::mutation_to_seqlib_mutation(mutation_bioprep)?;
 
         // Convert to a Single Base substition (DNA or RNA)
-        let sbs = match SingleBaseSubstitution::<dyn ConcreteBase>::try_from(&mutation) {
+        let sbs = match DnaSingleBaseSubstitution::try_from(&mutation) {
             Ok(sbs) => sbs,
             Err(_) => continue,
         };
@@ -53,6 +53,9 @@ pub fn tally_titv<W: Write>(snv_tsv: &Path, writer: W) -> Result<()> {
             seqlib::mutation::TiTv::Transversion => tally.transversion += 1,
         };
     }
+
+    // Create Versioned writer
+    let writer = create_versioned_tsv_writer(writer, "Tally (TiTV)")?;
 
     // Serialize object to writer
     serialize_object_to_writer(writer, tally, "Tally (TiTv)")?;
@@ -64,9 +67,6 @@ pub fn tally_titv<W: Write>(snv_tsv: &Path, writer: W) -> Result<()> {
 pub fn tally_sbs6<W: Write>(snv_tsv: &Path, writer: W) -> Result<()> {
     // Create reader
     let mut rdr = read_mutations_tsv(snv_tsv)?;
-
-    // Create writer
-    let mut writer = create_tsv_writer(writer);
 
     // Initialise tally count
     let mut tally = TallySbs6::default();
@@ -111,10 +111,11 @@ pub fn tally_sbs6<W: Write>(snv_tsv: &Path, writer: W) -> Result<()> {
         }
     }
 
-    // Write the tally to the writer
-    writer
-        .serialize(tally)
-        .map_err(|source| Error::write("tally-sbs6", source.into()))?;
+    // Create Versioned Writer (pre-writes tool name and version to header)
+    let writer = create_versioned_tsv_writer(writer, "Tally (SBS6)")?;
+
+    // Serialize object to writer
+    serialize_object_to_writer(writer, tally, "Tally (SBS6)")?;
 
     Ok(())
 }
@@ -123,11 +124,6 @@ pub fn tally_sbs6<W: Write>(snv_tsv: &Path, writer: W) -> Result<()> {
 pub fn tally_small_mutation_types<W: Write>(snv_tsv: &Path, writer: W) -> Result<()> {
     // Create reader
     let mut rdr = read_mutations_tsv(snv_tsv)?;
-
-    let mut writer = csv::WriterBuilder::new()
-        .has_headers(true)
-        .delimiter(b'\t')
-        .from_writer(writer);
 
     // Initialise counter
     let mut tally = TallySmallMutationType::default();
@@ -149,11 +145,11 @@ pub fn tally_small_mutation_types<W: Write>(snv_tsv: &Path, writer: W) -> Result
             SmallMutationType::DELETION => tally.deletion += 1,
         }
     }
+    // Create Versioned Writer (pre-writes tool name and version to header)
+    let writer = create_versioned_tsv_writer(writer, "Tally (TiTv)")?;
 
-    // Print to stdout
-    writer
-        .serialize(tally)
-        .map_err(|source| Error::write("tally-titv", source.into()))?;
+    // Serialize object to writer
+    serialize_object_to_writer(writer, tally, "Tally (TiTv)")?;
 
     Ok(())
 }

@@ -1,10 +1,29 @@
 use crate::error::{Error, Result};
 use std::{fs::File, io::Write, path::Path};
 
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const TOOLNAME: &str = env!("CARGO_PKG_NAME");
+
+fn write_bioprep_version_header<W: Write>(writer: &mut W, filetype: &str) -> Result<()> {
+    writeln!(writer, "# {TOOLNAME}: {VERSION}")
+        .map_err(|source| Error::write(filetype, source.into()))
+}
+
+/// Create a versioned version of the tsv writer (writes version when called and returns the writer)
+pub fn create_versioned_tsv_writer<W: Write>(
+    mut writer: W,
+    filetype: &str,
+) -> Result<csv::Writer<W>> {
+    write_bioprep_version_header(&mut writer, filetype)?;
+
+    Ok(create_tsv_writer(writer))
+}
+
 pub fn read_mutations_tsv(snv_tsv: &Path) -> Result<csv::Reader<File>> {
     csv::ReaderBuilder::new()
         .delimiter(b'\t')
         .has_headers(true)
+        .comment(Some(b'#'))
         .from_path(snv_tsv)
         .map_err(|source| Error::ReadTsv {
             path: snv_tsv.to_owned(),

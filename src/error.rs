@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use anyhow::Error as AnyhowError;
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -13,42 +14,42 @@ pub enum Error {
     ReadVcf {
         path: PathBuf,
         #[source]
-        source: std::io::Error,
+        source: AnyhowError,
     },
 
     #[error("failed to parse VCF header: {path}")]
     ParseVcfHeader {
         path: PathBuf,
         #[source]
-        source: std::io::Error,
+        source: AnyhowError,
     },
 
     #[error("failed to parse VCF record: {path}")]
     ParseVcfRecord {
         path: PathBuf,
         #[source]
-        source: std::io::Error,
+        source: AnyhowError,
     },
 
     #[error("failed to evaluate FILTER/PASS status for VCF record {record_id}")]
     FilterStatus {
         record_id: String,
         #[source]
-        source: std::io::Error,
+        source: AnyhowError,
     },
 
     #[error("failed to write: {filetype}")]
     Write {
         filetype: String,
         #[source]
-        source: Box<dyn std::error::Error + Send + Sync + 'static>,
+        source: AnyhowError,
     },
 
     #[error("failed to flush: {filetype}")]
     Flush {
         filetype: String,
         #[source]
-        source: std::io::Error,
+        source: AnyhowError,
     },
 
     #[error("invalid breakend pairing: {0}")]
@@ -76,26 +77,26 @@ pub enum Error {
     ReadTsv {
         path: PathBuf,
         #[source]
-        source: csv::Error,
+        source: AnyhowError,
     },
 
     #[error("failed to deserialize mutation from TSV file: {path}")]
     DeserializeMutation {
         path: PathBuf,
         #[source]
-        source: csv::Error,
+        source: AnyhowError,
     },
     #[error("Failed to convert bioprep mutation to seqlib equivalent. Problematic field: {field}")]
     InvalidSequenceForConversion {
         field: String,
         #[source]
-        source: seqlib::error::Error,
+        source: AnyhowError,
     },
 
     #[error("Failed to convert bioprep mutation to seqlib equivalent. Problematic field: position")]
     InvalidPositionForConversion {
         #[source]
-        source: seqlib::error::Error,
+        source: AnyhowError,
     },
 }
 
@@ -116,13 +117,10 @@ impl Error {
         }
     }
 
-    pub(crate) fn write(
-        filetype: impl Into<String>,
-        source: impl std::error::Error + Send + Sync + 'static,
-    ) -> Self {
+    pub(crate) fn write(filetype: impl Into<String>, source: AnyhowError) -> Self {
         Self::Write {
             filetype: filetype.into(),
-            source: Box::new(source),
+            source,
         }
     }
 
@@ -133,14 +131,14 @@ impl Error {
         }
     }
 
-    pub(crate) fn parse_vcf_record(path: &Path, source: std::io::Error) -> Self {
+    pub(crate) fn parse_vcf_record(path: &Path, source: AnyhowError) -> Self {
         Self::ParseVcfRecord {
             path: path.to_owned(),
             source,
         }
     }
 
-    pub(crate) fn flush(filetype: impl Into<String>, source: std::io::Error) -> Self {
+    pub(crate) fn flush(filetype: impl Into<String>, source: AnyhowError) -> Self {
         Self::Flush {
             filetype: filetype.into(),
             source,

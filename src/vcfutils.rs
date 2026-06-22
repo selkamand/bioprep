@@ -306,7 +306,7 @@ pub(crate) fn is_pass(record: &vcf::Record, header: &vcf::Header) -> Result<bool
         Ok(b) => Ok(b),
         Err(err) => Err(Error::FilterStatus {
             record_id: parse_id(record).unwrap_or("ID not found".to_string()),
-            source: err,
+            source: err.into(),
         }),
     }
 }
@@ -345,7 +345,7 @@ pub(crate) fn build_vcf_reader(vcf: &Path) -> Result<vcf::io::reader::Reader<Box
         .build_from_path(vcf)
         .map_err(|source| Error::ReadVcf {
             path: vcf.to_owned(),
-            source,
+            source: source.into(),
         })?;
 
     Ok(reader)
@@ -359,7 +359,7 @@ pub(crate) fn read_vcf_header(
         Ok(header) => Ok(header),
         Err(source) => Err(Error::ParseVcfHeader {
             path: path.to_owned(),
-            source,
+            source: source.into(),
         }),
     }
 }

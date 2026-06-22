@@ -7,7 +7,7 @@ use crate::{
     seqlibutils,
     tallytypes::{TallySbs6, TallySmallMutationType, TallyTiTv},
 };
-use seqlib::mutation::SmallMutationType;
+use seqlib::{base::DnaBase, mutation::SmallMutationType, sbs::DnaSingleBaseSubstitution};
 use std::{
     io::{BufWriter, Write},
     path::Path,
@@ -30,7 +30,7 @@ pub fn tally_titv<W: Write>(snv_tsv: &Path, writer: W) -> Result<()> {
         // Deserialize into mutation class from this crate
         let mutation_bioprep: Mutation = result.map_err(|source| Error::DeserializeMutation {
             path: snv_tsv.to_owned(),
-            source,
+            source: source.into(),
         })?;
 
         // Convert to a seqlib SmallMutation type to get
@@ -60,36 +60,53 @@ pub fn tally_sbs6<W: Write>(snv_tsv: &Path, writer: W) -> Result<()> {
     // Create writer
     let mut writer = create_tsv_writer(writer);
 
-    // Initialise counter
-    let tally = TallySbs6::default();
+    // Initialise tally count
+    let mut tally = TallySbs6::default();
 
     // Loop through mutation file
     for result in rdr.deserialize() {
         // Deserialize into mutation class from this crate
         let mutation_bioprep: Mutation = result.map_err(|source| Error::DeserializeMutation {
             path: snv_tsv.to_owned(),
-            source,
+            source: source.into(),
         })?;
 
-        // Convert
+        // Convert our internal mutation type to seqlib DNA mutation
+        // which has much better methods for subclassifying sequences
         let mutation = seqlibutils::mutation_to_seqlib_mutation(mutation_bioprep)?;
-        //TODO: add actual SBS6 mutation type classification
 
-        todo!("Add actual SBS6 mutation type classification")
-        // match mutation.titv() {
-        //     Some(val) => match val {
-        //         seqlib::mutation::TiTv::Transition => tally.transition += 1,
-        //         seqlib::mutation::TiTv::Transversion => tally.transition += 1,
-        //     },
-        //     None => continue,
-        // };
+        // Attempt conversion to a DNA  single base substitition.
+        // If we can not convert, currently continue.
+        // If we want error messages we can always match on the specific error types
+        // and log relevant info
+        let sbs = match DnaSingleBaseSubstitution::try_from(&mutation) {
+            Ok(sbs) => sbs,
+            Err(_) => continue,
+        };
+
+        // Pyrimidine Center
+        let pyrimidine_centered = sbs.pyrimidine_center();
+
+        match (
+            pyrimidine_centered.reference(),
+            pyrimidine_centered.alternative(),
+        ) {
+            (DnaBase::C, DnaBase::A) => tally.c_a += 1,
+            (DnaBase::C, DnaBase::G) => tally.c_g += 1,
+            (DnaBase::C, DnaBase::T) => tally.c_t += 1,
+            (DnaBase::T, DnaBase::A) => tally.t_a += 1,
+            (DnaBase::T, DnaBase::C) => tally.t_c += 1,
+            (DnaBase::T, DnaBase::G) => tally.t_g += 1,
+            _ => unreachable!(
+                "Pyrimidine centering should not allow non-C/T reference bases. Failed for {sbs} If you see this message please create a new github issue"
+            ),
+        }
     }
 
-    // Print to stdout
-
+    // Write the tally to the writer
     writer
         .serialize(tally)
-        .map_err(|source| Error::write("tally-sbs6", source))?;
+        .map_err(|source| Error::write("tally-sbs6", source.into()))?;
 
     Ok(())
 }
@@ -111,7 +128,7 @@ pub fn tally_small_mutation_types<W: Write>(snv_tsv: &Path, writer: W) -> Result
     for result in rdr.deserialize() {
         let mutation_bioprep: Mutation = result.map_err(|source| Error::DeserializeMutation {
             path: snv_tsv.to_owned(),
-            source,
+            source: source.into(),
         })?;
 
         let mutation = seqlibutils::mutation_to_seqlib_mutation(mutation_bioprep)?;
@@ -128,7 +145,7 @@ pub fn tally_small_mutation_types<W: Write>(snv_tsv: &Path, writer: W) -> Result
     // Print to stdout
     writer
         .serialize(tally)
-        .map_err(|source| Error::write("tally-titv", source))?;
+        .map_err(|source| Error::write("tally-titv", source.into()))?;
 
     Ok(())
 }
@@ -143,7 +160,7 @@ pub fn tally_sbs96(snv_tsv: &Path, _reference: &Path) -> Result<()> {
         .from_path(snv_tsv)
         .map_err(|source| Error::ReadTsv {
             path: snv_tsv.to_owned(),
-            source,
+            source: source.into(),
         })?;
 
     // Create writer (to stdout)
@@ -154,7 +171,7 @@ pub fn tally_sbs96(snv_tsv: &Path, _reference: &Path) -> Result<()> {
     for result in mutation_rdr.deserialize() {
         let _mutation: Mutation = result.map_err(|source| Error::DeserializeMutation {
             path: snv_tsv.to_owned(),
-            source,
+            source: source.into(),
         })?;
 
         // Read mutation

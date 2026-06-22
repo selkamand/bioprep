@@ -8,19 +8,22 @@ pub fn mutation_to_seqlib_mutation(
     let alt_sequence = IupacDnaSeq::new(&mutation.alternative).map_err(|source| {
         Error::InvalidSequenceForConversion {
             field: "alternative".to_owned(),
-            source,
+            source: source.into(),
         }
     })?;
 
     let ref_sequence = IupacDnaSeq::new(&mutation.reference).map_err(|source| {
         Error::InvalidSequenceForConversion {
             field: "reference".to_owned(),
-            source,
+            source: source.into(),
         }
     })?;
 
-    let pos = seqlib::coord::Pos::try_from(mutation.pos)
-        .map_err(|source| Error::InvalidPositionForConversion { source })?;
+    let pos = seqlib::coord::Pos::try_from(mutation.pos).map_err(|source| {
+        Error::InvalidPositionForConversion {
+            source: source.into(),
+        }
+    })?;
 
     Ok(IupacDnaSmallMutation::new(
         mutation.chrom,
@@ -32,4 +35,3 @@ pub fn mutation_to_seqlib_mutation(
         true,
     ))
 }
-

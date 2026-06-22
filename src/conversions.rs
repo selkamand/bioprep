@@ -163,7 +163,7 @@ pub fn convert_svcf_to_bedpe(vcf: &Path, options: SvToolConfig) -> Result<()> {
     let stats = write_svcf_as_bedpe(vcf, options, stdout.lock())?;
     stats
         .print_summary(stderr.lock())
-        .map_err(|source| Error::write("stats", source))?;
+        .map_err(|source| Error::write("stats", source.into()))?;
     Ok(())
 }
 
@@ -192,7 +192,7 @@ pub fn write_svcf_as_bedpe<W: Write>(
 
     for result in reader.records() {
         stats.total_breakends_before_filtering += 1;
-        let record = result.map_err(|source| Error::parse_vcf_record(vcf, source))?;
+        let record = result.map_err(|source| Error::parse_vcf_record(vcf, source.into()))?;
 
         if !vcfutils::is_pass(&record, &header)? {
             continue;
@@ -216,14 +216,14 @@ pub fn write_svcf_as_bedpe<W: Write>(
 
         writer
             .serialize(bedpe)
-            .map_err(|source| Error::write("bedpe", source))?;
+            .map_err(|source| Error::write("bedpe", source.into()))?;
 
         stats.proper_breakpoints += 1;
     }
 
     writer
         .flush()
-        .map_err(|source| Error::flush("bedpe", source))?;
+        .map_err(|source| Error::flush("bedpe", source.into()))?;
 
     stats.unmatched_breakends = waitlist.len() as u64;
     Ok(stats)
@@ -249,7 +249,7 @@ pub fn convert_svcf_to_breakend_tsv(vcf: &Path, options: SvToolConfig) -> Result
     let stats = write_svcf_as_breakend_tsv(vcf, options, stdout.lock())?;
     stats
         .print_summary(stderr.lock())
-        .map_err(|source| Error::write("stats", source))?;
+        .map_err(|source| Error::write("stats", source.into()))?;
     Ok(())
 }
 
@@ -271,7 +271,7 @@ pub fn write_svcf_as_breakend_tsv<W: Write>(
 
     for result in reader.records() {
         stats.total_breakends_before_filtering += 1;
-        let record = result.map_err(|source| Error::parse_vcf_record(vcf, source))?;
+        let record = result.map_err(|source| Error::parse_vcf_record(vcf, source.into()))?;
 
         if !vcfutils::is_pass(&record, &header)? {
             continue;
@@ -289,12 +289,12 @@ pub fn write_svcf_as_breakend_tsv<W: Write>(
 
         writer
             .serialize(simplebreakend)
-            .map_err(|source| Error::write("breakend-tsv", source))?;
+            .map_err(|source| Error::write("breakend-tsv", source.into()))?;
     }
 
     writer
         .flush()
-        .map_err(|source| Error::flush("breakend-tsv", source))?;
+        .map_err(|source| Error::flush("breakend-tsv", source.into()))?;
 
     Ok(stats)
 }
@@ -319,7 +319,7 @@ pub fn convert_snv_vcf_to_tsv(vcf: &Path, options: SnvToolConfig) -> Result<()> 
     let stats = write_snv_vcf_as_tsv(vcf, options, stdout.lock())?;
     stats
         .print_summary(stderr.lock())
-        .map_err(|source| Error::write("stats", source))?;
+        .map_err(|source| Error::write("stats", source.into()))?;
     Ok(())
 }
 
@@ -346,7 +346,7 @@ pub fn write_snv_vcf_as_tsv<W: Write>(
 
     for result in reader.records() {
         stats.total_records += 1;
-        let record = result.map_err(|source| Error::parse_vcf_record(vcf, source))?;
+        let record = result.map_err(|source| Error::parse_vcf_record(vcf, source.into()))?;
 
         if !vcfutils::is_pass(&record, &header)? {
             continue;
@@ -357,12 +357,12 @@ pub fn write_snv_vcf_as_tsv<W: Write>(
 
         writer
             .serialize(mutation)
-            .map_err(|source| Error::write("snv-tsv", source))?;
+            .map_err(|source| Error::write("snv-tsv", source.into()))?;
     }
 
     writer
         .flush()
-        .map_err(|source| Error::flush("snv-tsv", source))?;
+        .map_err(|source| Error::flush("snv-tsv", source.into()))?;
 
     Ok(stats)
 }

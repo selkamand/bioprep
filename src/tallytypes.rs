@@ -7,14 +7,20 @@ pub struct TallyTiTv {
     pub transversion: u64,
 }
 
-/// Count of transitions vs transversions
+/// Count of pyrmidine centered single base substitions
 #[derive(Default, Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub struct TallySbs6 {
+    #[serde(rename = "C>A")]
     pub c_a: u64,
+    #[serde(rename = "C>G")]
     pub c_g: u64,
+    #[serde(rename = "C>T")]
     pub c_t: u64,
+    #[serde(rename = "T>A")]
     pub t_a: u64,
+    #[serde(rename = "T>C")]
     pub t_c: u64,
+    #[serde(rename = "T>G")]
     pub t_g: u64,
 }
 
@@ -27,4 +33,3 @@ pub struct TallySmallMutationType {
     pub insertion: u64,
     pub deletion: u64,
 }
-

@@ -8,7 +8,7 @@ pub fn read_mutations_tsv(snv_tsv: &Path) -> Result<csv::Reader<File>> {
         .from_path(snv_tsv)
         .map_err(|source| Error::ReadTsv {
             path: snv_tsv.to_owned(),
-            source,
+            source: source.into(),
         })
 }
 
@@ -42,7 +42,7 @@ pub(crate) fn serialize_object_to_writer<W: Write, T: serde::Serialize>(
 ) -> Result<()> {
     writer
         .serialize(object)
-        .map_err(|source| Error::write(filetype, source))?;
+        .map_err(|source| Error::write(filetype, source.into()))?;
 
     Ok(())
 }

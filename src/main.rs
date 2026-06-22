@@ -144,10 +144,6 @@ enum ClassificationSchemes {
         /// Path to a standardised bioprep SNV TSV
         #[arg(short = 'i', long = "input", value_name = "mutation tsv", value_hint = ValueHint::FilePath)]
         snv_tsv: PathBuf,
-
-        /// Reference genome FASTA used to fetch trinucleotide context
-        #[arg(short = 'r', long = "reference", value_name = "fasta", value_hint = ValueHint::FilePath)]
-        reference: PathBuf,
     },
     /// Tally structural variants into SV32 substitution classes
     Sv32 {
@@ -222,11 +218,8 @@ fn main() -> Result<()> {
             ClassificationSchemes::Sbs96 { snv_tsv, reference } => {
                 bioprep::tally::tally_sbs96(snv_tsv.as_path(), reference.as_path())?;
             }
-            ClassificationSchemes::Sbs6 {
-                snv_tsv: _,
-                reference: _,
-            } => {
-                todo!("No implementation for SBS6 tallying yet")
+            ClassificationSchemes::Sbs6 { snv_tsv } => {
+                bioprep::tally::tally_sbs6(&snv_tsv, std::io::stdout().lock())?
             }
             ClassificationSchemes::Sv32 {
                 bedpe: _,

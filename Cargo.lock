@@ -368,7 +368,7 @@ checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
 [[package]]
 name = "seqlib"
 version = "0.1.0"
-source = "git+https://github.com/selkamand/seqlib#45d222bcbfb6189533aff797ff99b87aecf4c9ec"
+source = "git+https://github.com/selkamand/seqlib#d277742a505cf5c89e7198ec891e5953e4d49813"
 dependencies = [
  "const_panic",
  "thiserror",

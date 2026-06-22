@@ -150,10 +150,12 @@ enum ClassificationSchemes {
         /// Path to a standardised bioprep BEDPE-like TSV
         #[arg(short = 'i', long = "input", value_name = "bedpe-tsv", value_hint = ValueHint::FilePath)]
         bedpe: PathBuf,
-
-        /// Reference genome FASTA
-        #[arg(short = 'r', long = "reference", value_name = "fasta", value_hint = ValueHint::FilePath)]
-        reference: PathBuf,
+    },
+    /// Tally breakpoints into 4 types (Trans, Del, Inv, Tds)
+    Breakpoints {
+        /// Path to a standardised bioprep BEDPE-like TSV
+        #[arg(short = 'i', long = "input", value_name = "bedpe-tsv", value_hint = ValueHint::FilePath)]
+        bedpe: PathBuf,
     },
 }
 
@@ -221,10 +223,7 @@ fn main() -> Result<()> {
             ClassificationSchemes::Sbs6 { snv_tsv } => {
                 bioprep::tally::tally_sbs6(&snv_tsv, std::io::stdout().lock())?
             }
-            ClassificationSchemes::Sv32 {
-                bedpe: _,
-                reference: _,
-            } => {
+            ClassificationSchemes::Sv32 { bedpe: _ } => {
                 todo!("No implementation for Sv32 tallying yet")
             }
             ClassificationSchemes::Titv { snv_tsv } => {
@@ -235,6 +234,9 @@ fn main() -> Result<()> {
                     snv_tsv.as_path(),
                     std::io::stdout().lock(),
                 )?;
+            }
+            ClassificationSchemes::Breakpoints { bedpe } => {
+                bioprep::tally::tally_breakpoint_types(&bedpe, std::io::stdout().lock())?
             }
         },
         Commands::Stats { statset } => match statset {

@@ -19,18 +19,6 @@ pub fn create_versioned_tsv_writer<W: Write>(
     Ok(create_tsv_writer(writer))
 }
 
-pub fn read_mutations_tsv(snv_tsv: &Path) -> Result<csv::Reader<File>> {
-    csv::ReaderBuilder::new()
-        .delimiter(b'\t')
-        .has_headers(true)
-        .comment(Some(b'#'))
-        .from_path(snv_tsv)
-        .map_err(|source| Error::ReadTsv {
-            path: snv_tsv.to_owned(),
-            source: source.into(),
-        })
-}
-
 pub fn create_tsv_writer<W: Write>(writer: W) -> csv::Writer<W> {
     csv::WriterBuilder::new()
         .has_headers(true)
@@ -64,4 +52,30 @@ pub(crate) fn serialize_object_to_writer<W: Write, T: serde::Serialize>(
         .map_err(|source| Error::write(filetype, source.into()))?;
 
     Ok(())
+}
+
+/// Read the mutations TSV file produced by convert snv command
+pub fn read_mutations_tsv(snv_tsv: &Path) -> Result<csv::Reader<File>> {
+    csv::ReaderBuilder::new()
+        .delimiter(b'\t')
+        .has_headers(true)
+        .comment(Some(b'#'))
+        .from_path(snv_tsv)
+        .map_err(|source| Error::ReadTsv {
+            path: snv_tsv.to_owned(),
+            source: source.into(),
+        })
+}
+
+/// Read the bedpe breakpoint TSV file produced by convert svcf --to bedpe command
+pub fn read_bedpe_tsv(bedpe_tsv: &Path) -> Result<csv::Reader<File>> {
+    csv::ReaderBuilder::new()
+        .delimiter(b'\t')
+        .has_headers(true)
+        .comment(Some(b'#'))
+        .from_path(bedpe_tsv)
+        .map_err(|source| Error::ReadTsv {
+            path: bedpe_tsv.to_owned(),
+            source: source.into(),
+        })
 }

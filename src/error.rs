@@ -86,6 +86,13 @@ pub enum Error {
         #[source]
         source: AnyhowError,
     },
+
+    #[error("failed to deserialize breakpoint from bedpe TSV file: {path}")]
+    DeserializeBreakpoint {
+        path: PathBuf,
+        #[source]
+        source: AnyhowError,
+    },
     #[error("Failed to convert bioprep mutation to seqlib equivalent. Problematic field: {field}")]
     InvalidSequenceForConversion {
         field: String,

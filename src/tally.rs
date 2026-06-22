@@ -3,12 +3,12 @@
 use crate::{
     error::{Error, Result},
     io::{
-        create_tsv_writer, create_versioned_tsv_writer, read_mutations_tsv,
+        create_tsv_writer, create_versioned_tsv_writer, read_bedpe_tsv, read_mutations_tsv,
         serialize_object_to_writer,
     },
-    pubtypes::Mutation,
+    pubtypes::{self, BreakpointBedpe, Mutation, Strand},
     seqlibutils,
-    tallytypes::{TallySbs6, TallySmallMutationType, TallyTiTv},
+    tallytypes::{TallyBreakpointType, TallySbs6, TallySmallMutationType, TallyTiTv},
 };
 use seqlib::{
     base::{ConcreteBase, DnaBase},
@@ -180,5 +180,42 @@ pub fn tally_sbs96(snv_tsv: &Path, _reference: &Path) -> Result<()> {
 
         // Read mutation
     }
+    Ok(())
+}
+
+/// Classify breakpoints as Inversions, Deletions, Tandem Duplications, and Inversions
+pub fn tally_breakpoint_types<W: Write>(bedpe: &Path, writer: W) -> Result<()> {
+    // Create reader
+    let mut rdr = read_bedpe_tsv(bedpe)?;
+
+    // Initialise counter
+    let mut tally = TallyBreakpointType::default();
+
+    // Tally TiTv
+    for result in rdr.deserialize() {
+        let breakpoint: BreakpointBedpe =
+            result.map_err(|source| Error::DeserializeBreakpoint {
+                path: bedpe.to_owned(),
+                source: source.into(),
+            })?;
+
+        if breakpoint.chrom1 != breakpoint.chrom2 {
+            tally.trans += 1;
+            continue;
+        }
+
+        match (breakpoint.strand1, breakpoint.strand2) {
+            (Strand::Plus, Strand::Plus) => tally.inv += 1,
+            (Strand::Plus, Strand::Minus) => tally.del += 1,
+            (Strand::Minus, Strand::Plus) => tally.tds += 1,
+            (Strand::Minus, Strand::Minus) => tally.inv += 1,
+        };
+    }
+    // Create Versioned Writer (pre-writes tool name and version to header)
+    let writer = create_versioned_tsv_writer(writer, "Tally (BreakpointTypes)")?;
+
+    // Serialize object to writer
+    serialize_object_to_writer(writer, tally, "Tally (BreakpointTypes)")?;
+
     Ok(())
 }

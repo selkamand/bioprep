@@ -76,6 +76,9 @@ enum Commands {
         statset: StatSets,
     },
 
+    /// Mutational Signatures
+    Signatures {},
+
     /// Predict biological properties of a tumour
     Predict {
         #[command(subcommand)]
@@ -192,6 +195,28 @@ enum StatSets {
         #[arg(short = 'i', long = "input", value_name = "mutations.tsv", value_hint = ValueHint::FilePath)]
         mutations: PathBuf,
     },
+    /// Estimate mitochondrial burden
+    Mitochondria {
+        /// Path to a idxstats tsv
+        #[arg(short = 'i', long = "input", value_name = "idxstats.tsv", value_hint = ValueHint::FilePath)]
+        idxstats: PathBuf,
+
+        /// Purity
+        #[arg(long = "purity", value_name = "purity")]
+        purity: f32,
+
+        /// Ploidy
+        #[arg(long = "ploidy", value_name = "ploidy")]
+        ploidy: f32,
+
+        /// Mitochondrial chromosome name
+        #[arg(long = "mtname", value_name = "mitochondrial contig name")]
+        mtname: String,
+
+        /// Autosomal chromosome names (comma separated)
+        #[arg(long = "mtname", value_name = "chr1,chr2,...", value_delimiter=',', num_args = 1..)]
+        chrnames: Vec<String>,
+    },
 }
 fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -243,6 +268,15 @@ fn main() -> Result<()> {
             StatSets::GenomeInstability { mutations: _ } => {
                 todo!("No implementation for genome instability stats")
             }
+            StatSets::Mitochondria {
+                idxstats: _,
+                purity: _,
+                ploidy: _,
+                mtname: _,
+                chrnames: _,
+            } => {
+                todo!("No implementation for mitochondrial burden stats")
+            }
         },
         Commands::Predict { model } => match model {
             PredictionModels::P53detect {
@@ -256,6 +290,7 @@ fn main() -> Result<()> {
                 todo!("ETV6detect model not yet implemented")
             }
         },
+        Commands::Signatures {} => todo!("Signature fitting not implemented yet"),
     };
 
     Ok(())

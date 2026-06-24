@@ -49,6 +49,7 @@ pub struct TallyBreakpointType {
     pub tds: u64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BreakpointType {
     Translocation,
     Deletion,
@@ -80,10 +81,74 @@ pub struct TallyBreakpointClusterType {
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub struct TallyBreakpointSize {
-    under_10kb: u64,
-    under_100kb: u64,
-    under_10mb: u64,
-    over_10mb: u64,
+    pub sizeless: u64,
+    #[serde(rename = "1_to_<=10kb")]
+    pub leq_10kb: u64,
+    #[serde(rename = "10kb_to_<=100kb")]
+    pub leq_100kb: u64,
+    #[serde(rename = "100kb_to_<=1mb")]
+    pub leq_1mb: u64,
+    #[serde(rename = "1mb_to_<=10mb")]
+    pub leq_10mb: u64,
+    #[serde(rename = ">10mb")]
+    pub over_10mb: u64,
+}
+
+/// Breakpoint size bins.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BreakpointSize {
+    /// Because they span different chromosomes translocations
+    /// do not have a length
+    Sizeless,
+    LeqTo10kb,
+    LeqTo100kb,
+    LeqTo1mb,
+    LeqTo10mb,
+    Over10mb,
+}
+
+impl BreakpointSize {
+    /// Identify the size of the event in the breakpoint bedpe (Start2-Start1)
+    pub fn from_breakpoint_bedpe(breakpoint: &BreakpointBedpe) -> Self {
+        // Translocations don't have a length
+        if breakpoint.chrom1 != breakpoint.chrom2 {
+            return Self::Sizeless;
+        }
+
+        let size = breakpoint.start2 - breakpoint.start1;
+        match size {
+            0 => Self::Sizeless,
+            1..=10_000 => Self::LeqTo10kb,
+            10_001..=100_000 => Self::LeqTo100kb,
+            100_001..=1_000_000 => Self::LeqTo1mb,
+            1_000_001..=10_000_000 => Self::LeqTo10mb,
+            10_000_001.. => Self::Over10mb,
+        }
+    }
+}
+
+/// SV Cluster types
+///
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BreakpointClusterType {
+    Clustered,
+    Unclustered,
+}
+
+impl BreakpointClusterType {
+    /// Cluster breakpoints based on https://doi.org/10.1186/s12864-023-09584-y
+    ///
+    /// Direct quote from manuscript:
+    /// This method segments a chromosome based on inter-mutational distance of SV breakpoints,
+    /// and if the average distance in a particular segment is less than 10 times the average
+    /// inter-mutational distance in the sample,
+    /// all breakpoints in the segment are considered clustered.
+    /// A minimum of 10 breakpoints must be present
+    /// for a given segment to be considered clustered,
+    /// otherwise all breakpoints in that segment are considered non-clustered.
+    pub fn from_breakpoint_bedpe(breakpoint: &BreakpointBedpe) -> Self {
+        todo!("Implement some kind of sort operation on ")
+    }
 }
 
 /// SV32 Classification Scheme

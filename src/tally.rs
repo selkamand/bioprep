@@ -9,7 +9,8 @@ use crate::{
     pubtypes::{self, BreakpointBedpe, Mutation, Strand},
     seqlibutils,
     tallytypes::{
-        BreakpointType, TallyBreakpointType, TallySbs6, TallySmallMutationType, TallyTiTv,
+        BreakpointSize, BreakpointType, TallyBreakpointSize, TallyBreakpointType, TallySbs6,
+        TallySmallMutationType, TallyTiTv,
     },
 };
 use seqlib::{
@@ -217,6 +218,49 @@ pub fn tally_breakpoint_types<W: Write>(bedpe: &Path, writer: W) -> Result<()> {
 
     // Serialize object to writer
     serialize_object_to_writer(writer, tally, "Tally (BreakpointTypes)")?;
+
+    Ok(())
+}
+
+/// Tally breakpoint by size
+///
+///
+/// Bins into sizeless -> 1-10kb -> 10kb-100kb -> 100kb-1mb -> 1mb-10mb -> >10mb
+/// where ranges (e.g. 1-10kb) are both-end inclusive
+pub fn tally_breakpoint_sizes<W: Write>(bedpe: &Path, writer: W) -> Result<()> {
+    // Create reader
+    let mut rdr = read_bedpe_tsv(bedpe)?;
+
+    // Initialise counter
+    let mut tally = TallyBreakpointSize::default();
+
+    // Iterate through breakpoint bedpe (deserialising into breakpoint bedpe format)
+    for result in rdr.deserialize() {
+        let breakpoint: BreakpointBedpe =
+            result.map_err(|source| Error::DeserializeBreakpoint {
+                path: bedpe.to_owned(),
+                source: source.into(),
+            })?;
+
+        // Infer breakpoint size bin based on bedpe
+        let breakpoint_binned = BreakpointSize::from_breakpoint_bedpe(&breakpoint);
+
+        // Tally based on breakpoint size
+        match breakpoint_binned {
+            BreakpointSize::Sizeless => tally.sizeless += 1,
+            BreakpointSize::LeqTo10kb => tally.leq_10kb += 1,
+            BreakpointSize::LeqTo100kb => tally.leq_100kb += 1,
+            BreakpointSize::LeqTo1mb => tally.leq_1mb += 1,
+            BreakpointSize::LeqTo10mb => tally.leq_10mb += 1,
+            BreakpointSize::Over10mb => tally.over_10mb += 1,
+        };
+    }
+
+    // Create Versioned Writer (pre-writes tool name and version to header)
+    let writer = create_versioned_tsv_writer(writer, "Tally (BreakpointSizes)")?;
+
+    // Serialize object to writer
+    serialize_object_to_writer(writer, tally, "Tally (BreakpointSizes)")?;
 
     Ok(())
 }

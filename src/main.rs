@@ -160,6 +160,12 @@ enum ClassificationSchemes {
         #[arg(short = 'i', long = "input", value_name = "bedpe-tsv", value_hint = ValueHint::FilePath)]
         bedpe: PathBuf,
     },
+    /// Tally breakpoints in size-bins. Translocations are conisdered sizeless
+    BreakpointSizes {
+        /// Path to a standardised bioprep BEDPE-like TSV
+        #[arg(short = 'i', long = "input", value_name = "bedpe-tsv", value_hint = ValueHint::FilePath)]
+        bedpe: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]
@@ -262,6 +268,9 @@ fn main() -> Result<()> {
             }
             ClassificationSchemes::Breakpoints { bedpe } => {
                 bioprep::tally::tally_breakpoint_types(&bedpe, std::io::stdout().lock())?
+            }
+            ClassificationSchemes::BreakpointSizes { bedpe } => {
+                bioprep::tally::tally_breakpoint_sizes(&bedpe, std::io::stdout().lock())?
             }
         },
         Commands::Stats { statset } => match statset {

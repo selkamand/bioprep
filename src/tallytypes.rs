@@ -127,30 +127,6 @@ impl BreakpointSize {
     }
 }
 
-/// SV Cluster types
-///
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum BreakpointClusterType {
-    Clustered,
-    Unclustered,
-}
-
-impl BreakpointClusterType {
-    /// Cluster breakpoints based on https://doi.org/10.1186/s12864-023-09584-y
-    ///
-    /// Direct quote from manuscript:
-    /// This method segments a chromosome based on inter-mutational distance of SV breakpoints,
-    /// and if the average distance in a particular segment is less than 10 times the average
-    /// inter-mutational distance in the sample,
-    /// all breakpoints in the segment are considered clustered.
-    /// A minimum of 10 breakpoints must be present
-    /// for a given segment to be considered clustered,
-    /// otherwise all breakpoints in that segment are considered non-clustered.
-    pub fn from_breakpoint_bedpe(breakpoint: &BreakpointBedpe) -> Self {
-        todo!("Implement some kind of sort operation on ")
-    }
-}
-
 /// SV32 Classification Scheme
 #[derive(Default, Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub struct TallySv32 {

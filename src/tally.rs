@@ -19,6 +19,7 @@ use seqlib::{
     sbs::{DnaSingleBaseSubstitution, SingleBaseSubstitution},
 };
 use std::{
+    collections::HashSet,
     io::{BufWriter, Write},
     path::Path,
 };
@@ -254,6 +255,49 @@ pub fn tally_breakpoint_sizes<W: Write>(bedpe: &Path, writer: W) -> Result<()> {
             BreakpointSize::LeqTo10mb => tally.leq_10mb += 1,
             BreakpointSize::Over10mb => tally.over_10mb += 1,
         };
+    }
+
+    // Create Versioned Writer (pre-writes tool name and version to header)
+    let writer = create_versioned_tsv_writer(writer, "Tally (BreakpointSizes)")?;
+
+    // Serialize object to writer
+    serialize_object_to_writer(writer, tally, "Tally (BreakpointSizes)")?;
+
+    Ok(())
+}
+
+/// Cluster breakpoints based on https://doi.org/10.1186/s12864-023-09584-y
+///
+/// Direct quote from manuscript:
+/// This method segments a chromosome based on inter-mutational distance of SV breakpoints,
+/// and if the average distance in a particular segment is less than 10 times the average
+/// inter-mutational distance in the sample,
+/// all breakpoints in the segment are considered clustered.
+/// A minimum of 10 breakpoints must be present
+/// for a given segment to be considered clustered,
+/// otherwise all breakpoints in that segment are considered non-clustered.
+pub fn tally_breakpoint_clustering<W: Write>(bedpe: &Path, writer: W) -> Result<()> {
+    // Create reader
+    let mut rdr = read_bedpe_tsv(bedpe)?;
+
+    // Initialise counter
+    let mut tally = TallyBreakpointSize::default();
+
+    // Initialise the variables we need to check for a break in sort order
+    let mut chroms: HashSet<String> = HashSet::new();
+    let mut last_chrom: String;
+    let mut last_position: u64 = 0;
+    // Iterate through breakpoint bedpe (deserialising into breakpoint bedpe format)
+    for result in rdr.deserialize() {
+        let breakpoint: BreakpointBedpe =
+            result.map_err(|source| Error::DeserializeBreakpoint {
+                path: bedpe.to_owned(),
+                source: source.into(),
+            })?;
+
+        todo!(
+            "Figure out how to cluster breakpoints. Return an error if the bedpe is unsorted and tell user to sort it (maybe we should add a sort subcommand)"
+        )
     }
 
     // Create Versioned Writer (pre-writes tool name and version to header)

@@ -8,7 +8,9 @@ use crate::{
     },
     pubtypes::{self, BreakpointBedpe, Mutation, Strand},
     seqlibutils,
-    tallytypes::{TallyBreakpointType, TallySbs6, TallySmallMutationType, TallyTiTv},
+    tallytypes::{
+        BreakpointType, TallyBreakpointType, TallySbs6, TallySmallMutationType, TallyTiTv,
+    },
 };
 use seqlib::{
     base::{ConcreteBase, DnaBase},
@@ -56,6 +58,40 @@ pub fn tally_titv<W: Write>(snv_tsv: &Path, writer: W) -> Result<()> {
 
     // Create Versioned writer
     let writer = create_versioned_tsv_writer(writer, "Tally (TiTV)")?;
+
+    // Serialize object to writer
+    serialize_object_to_writer(writer, tally, "Tally (TiTv)")?;
+
+    Ok(())
+}
+
+/// Tally the small mutation types
+pub fn tally_small_mutation_types<W: Write>(snv_tsv: &Path, writer: W) -> Result<()> {
+    // Create reader
+    let mut rdr = read_mutations_tsv(snv_tsv)?;
+
+    // Initialise counter
+    let mut tally = TallySmallMutationType::default();
+
+    // Tally TiTv
+    for result in rdr.deserialize() {
+        let mutation_bioprep: Mutation = result.map_err(|source| Error::DeserializeMutation {
+            path: snv_tsv.to_owned(),
+            source: source.into(),
+        })?;
+
+        let mutation = seqlibutils::mutation_to_seqlib_mutation(mutation_bioprep)?;
+
+        match mutation.class() {
+            SmallMutationType::SNV => tally.snv += 1,
+            SmallMutationType::DOUBLET => tally.doublet += 1,
+            SmallMutationType::MNV => tally.mnv += 1,
+            SmallMutationType::INSERTION => tally.insertion += 1,
+            SmallMutationType::DELETION => tally.deletion += 1,
+        }
+    }
+    // Create Versioned Writer (pre-writes tool name and version to header)
+    let writer = create_versioned_tsv_writer(writer, "Tally (TiTv)")?;
 
     // Serialize object to writer
     serialize_object_to_writer(writer, tally, "Tally (TiTv)")?;
@@ -120,40 +156,6 @@ pub fn tally_sbs6<W: Write>(snv_tsv: &Path, writer: W) -> Result<()> {
     Ok(())
 }
 
-/// Tally the small mutation types
-pub fn tally_small_mutation_types<W: Write>(snv_tsv: &Path, writer: W) -> Result<()> {
-    // Create reader
-    let mut rdr = read_mutations_tsv(snv_tsv)?;
-
-    // Initialise counter
-    let mut tally = TallySmallMutationType::default();
-
-    // Tally TiTv
-    for result in rdr.deserialize() {
-        let mutation_bioprep: Mutation = result.map_err(|source| Error::DeserializeMutation {
-            path: snv_tsv.to_owned(),
-            source: source.into(),
-        })?;
-
-        let mutation = seqlibutils::mutation_to_seqlib_mutation(mutation_bioprep)?;
-
-        match mutation.class() {
-            SmallMutationType::SNV => tally.snv += 1,
-            SmallMutationType::DOUBLET => tally.doublet += 1,
-            SmallMutationType::MNV => tally.mnv += 1,
-            SmallMutationType::INSERTION => tally.insertion += 1,
-            SmallMutationType::DELETION => tally.deletion += 1,
-        }
-    }
-    // Create Versioned Writer (pre-writes tool name and version to header)
-    let writer = create_versioned_tsv_writer(writer, "Tally (TiTv)")?;
-
-    // Serialize object to writer
-    serialize_object_to_writer(writer, tally, "Tally (TiTv)")?;
-
-    Ok(())
-}
-
 /// Classify Single base substitutions into 96 different types
 /// based on base change and and trinucleotide context of mutated base.
 pub fn tally_sbs96(snv_tsv: &Path, _reference: &Path) -> Result<()> {
@@ -191,7 +193,7 @@ pub fn tally_breakpoint_types<W: Write>(bedpe: &Path, writer: W) -> Result<()> {
     // Initialise counter
     let mut tally = TallyBreakpointType::default();
 
-    // Tally TiTv
+    // Iterate through breakpoint bedpe (deserialising into breakpoint bedpe format)
     for result in rdr.deserialize() {
         let breakpoint: BreakpointBedpe =
             result.map_err(|source| Error::DeserializeBreakpoint {
@@ -199,18 +201,17 @@ pub fn tally_breakpoint_types<W: Write>(bedpe: &Path, writer: W) -> Result<()> {
                 source: source.into(),
             })?;
 
-        if breakpoint.chrom1 != breakpoint.chrom2 {
-            tally.trans += 1;
-            continue;
-        }
+        // Infer breakpoint type based on bedpe
+        let breakpoint_type = BreakpointType::from_breakpoint_bedpe(&breakpoint);
 
-        match (breakpoint.strand1, breakpoint.strand2) {
-            (Strand::Plus, Strand::Plus) => tally.inv += 1,
-            (Strand::Plus, Strand::Minus) => tally.del += 1,
-            (Strand::Minus, Strand::Plus) => tally.tds += 1,
-            (Strand::Minus, Strand::Minus) => tally.inv += 1,
+        match breakpoint_type {
+            BreakpointType::Translocation => tally.trans += 1,
+            BreakpointType::Deletion => tally.del += 1,
+            BreakpointType::Inversion => tally.inv += 1,
+            BreakpointType::TandemDuplication => tally.tds += 1,
         };
     }
+
     // Create Versioned Writer (pre-writes tool name and version to header)
     let writer = create_versioned_tsv_writer(writer, "Tally (BreakpointTypes)")?;
 

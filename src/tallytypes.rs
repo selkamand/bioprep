@@ -1,5 +1,7 @@
 //! Structs that contain different types of tallies
 
+use crate::pubtypes::{self, BreakpointBedpe, Strand};
+
 /// Count of transitions vs transversions
 #[derive(Default, Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub struct TallyTiTv {
@@ -45,6 +47,29 @@ pub struct TallyBreakpointType {
     pub inv: u64,
     #[serde(rename = "TandemDuplication")]
     pub tds: u64,
+}
+
+pub enum BreakpointType {
+    Translocation,
+    Deletion,
+    Inversion,
+    TandemDuplication,
+}
+
+impl BreakpointType {
+    /// Identify Breakpoint Type of BreakpointBedpe file
+    pub fn from_breakpoint_bedpe(breakpoint: &BreakpointBedpe) -> Self {
+        if breakpoint.chrom1 != breakpoint.chrom2 {
+            return Self::Translocation;
+        }
+
+        match (&breakpoint.strand1, &breakpoint.strand2) {
+            (Strand::Plus, Strand::Plus) => Self::Inversion,
+            (Strand::Plus, Strand::Minus) => Self::Deletion,
+            (Strand::Minus, Strand::Plus) => Self::TandemDuplication,
+            (Strand::Minus, Strand::Minus) => Self::Inversion,
+        }
+    }
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]

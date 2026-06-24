@@ -301,10 +301,10 @@ pub fn tally_breakpoint_clustering<W: Write>(bedpe: &Path, writer: W) -> Result<
     }
 
     // Create Versioned Writer (pre-writes tool name and version to header)
-    let writer = create_versioned_tsv_writer(writer, "Tally (BreakpointSizes)")?;
+    let writer = create_versioned_tsv_writer(writer, "Tally (BreakpointCluster)")?;
 
     // Serialize object to writer
-    serialize_object_to_writer(writer, tally, "Tally (BreakpointSizes)")?;
+    serialize_object_to_writer(writer, tally, "Tally (BreakpointCluster)")?;
 
     Ok(())
 }

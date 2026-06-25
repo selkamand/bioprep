@@ -1,6 +1,10 @@
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+};
 
 use anyhow::Error as AnyhowError;
+use clap::builder::Str;
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -93,6 +97,18 @@ pub enum Error {
         #[source]
         source: AnyhowError,
     },
+    #[error("failed to deserialize copynumber segment from copynumber segment TSV file: {path}")]
+    DeserializeCopynumberSegment {
+        path: PathBuf,
+        #[source]
+        source: AnyhowError,
+    },
+    #[error("failed to deserialize idxstats file: {path}")]
+    DeserializeIdxstats {
+        path: PathBuf,
+        #[source]
+        source: AnyhowError,
+    },
     #[error("Failed to convert bioprep mutation to seqlib equivalent. Problematic field: {field}")]
     InvalidSequenceForConversion {
         field: String,
@@ -104,6 +120,15 @@ pub enum Error {
     InvalidPositionForConversion {
         #[source]
         source: AnyhowError,
+    },
+
+    #[error("Failed to find any mitochondrial contigs ({mtnames}) in idxstats file: {path}")]
+    MissingMitochondrialContig { path: PathBuf, mtnames: String },
+
+    #[error("Failed to find any autosomal contigs ({autosome_names}) in idxstats file: {path}")]
+    MissingAutosomalContig {
+        path: PathBuf,
+        autosome_names: String,
     },
 }
 

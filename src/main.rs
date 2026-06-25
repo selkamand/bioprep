@@ -2,9 +2,14 @@ use anyhow::Result;
 use bioprep::{
     config::{SnvTool, SvTool, configure_for_snv_tool},
     conversions::{convert_snv_vcf_to_tsv, convert_svcf_to_bedpe, convert_svcf_to_breakend_tsv},
+    stats::{calculate_mitochondrial_cn, calculate_segment_stats},
 };
 use clap::{Parser, Subcommand, ValueEnum, ValueHint};
-use std::{fmt, path::PathBuf};
+use std::{
+    collections::{HashSet, hash_set},
+    fmt,
+    path::PathBuf,
+};
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
 enum SvcfTool {
@@ -195,11 +200,22 @@ enum PredictionModels {
 
 #[derive(Subcommand)]
 enum StatSets {
-    /// Compute measures of genome instability including autosomal LOH and SV burden
+    ////// Compute measures of genome instability including autosomal LOH and SV burden
     GenomeInstability {
-        /// Path to a standardised bioprep SNV TSV
-        #[arg(short = 'i', long = "input", value_name = "mutations.tsv", value_hint = ValueHint::FilePath)]
-        mutations: PathBuf,
+        /// Path to a copy number segments file produced by purple
+        #[arg(short = 's', long = "segment", value_name = "segments.tsv", value_hint = ValueHint::FilePath)]
+        segments_tsv: PathBuf,
+
+        /// Autosomal chromosome names (comma separated)
+        #[arg(long = "autosomes", value_name = "chr1,chr2,...", value_delimiter=',', num_args = 1..)]
+        chrnames: Vec<String>,
+    },
+
+    /// Compute measures of genome instability including autosomal LOH and SV burden
+    SegmentStats {
+        /// Path to a copy number segments file produced by purple
+        #[arg(short = 's', long = "segment", value_name = "segments.tsv", value_hint = ValueHint::FilePath)]
+        segments_tsv: PathBuf,
     },
     /// Estimate mitochondrial burden
     Mitochondria {
@@ -211,17 +227,25 @@ enum StatSets {
         #[arg(long = "purity", value_name = "purity")]
         purity: f32,
 
-        /// Ploidy
-        #[arg(long = "ploidy", value_name = "ploidy")]
-        ploidy: f32,
+        /// Background Ploidy
+        #[arg(
+            long = "bg_ploidy",
+            value_name = "background_ploidy",
+            default_value_t = 2_f32
+        )]
+        background_ploidy: f32,
+
+        /// Tumour Ploidy
+        #[arg(long = "ploidy", value_name = "tumour_ploidy")]
+        tumour_ploidy: f32,
 
         /// Mitochondrial chromosome name
-        #[arg(long = "mtname", value_name = "mitochondrial contig name")]
-        mtname: String,
+        #[arg(long = "mtname", value_name = "mitochondrial contig name", default_value = None)]
+        mtname: Option<String>,
 
         /// Autosomal chromosome names (comma separated)
-        #[arg(long = "mtname", value_name = "chr1,chr2,...", value_delimiter=',', num_args = 1..)]
-        chrnames: Vec<String>,
+        #[arg(long = "autosomes", value_name = "chr1,chr2,...", value_delimiter=',', num_args = 1.., default_value = None)]
+        chrnames: Option<Vec<String>>,
     },
 }
 fn main() -> Result<()> {
@@ -274,17 +298,37 @@ fn main() -> Result<()> {
             }
         },
         Commands::Stats { statset } => match statset {
-            StatSets::GenomeInstability { mutations: _ } => {
-                todo!("No implementation for genome instability stats")
-            }
-            StatSets::Mitochondria {
-                idxstats: _,
-                purity: _,
-                ploidy: _,
-                mtname: _,
+            StatSets::GenomeInstability {
+                segments_tsv,
                 chrnames: _,
             } => {
-                todo!("No implementation for mitochondrial burden stats")
+                calculate_segment_stats(&segments_tsv, std::io::stdout().lock(), None)?;
+            }
+            StatSets::Mitochondria {
+                idxstats,
+                purity,
+                mtname,
+                chrnames,
+                background_ploidy,
+                tumour_ploidy,
+            } => {
+                // Cast into hashmap
+                let chrnames: Option<HashSet<String>> = chrnames.map(|xs| xs.into_iter().collect());
+                let mtname: Option<HashSet<String>> = mtname.map(|x| HashSet::from([x]));
+
+                calculate_mitochondrial_cn(
+                    &idxstats,
+                    background_ploidy,
+                    tumour_ploidy,
+                    purity,
+                    std::io::stdout().lock(),
+                    chrnames,
+                    mtname,
+                )?;
+            }
+            StatSets::SegmentStats { segments_tsv } => {
+                //TODO: Allow user to specify autosomes
+                calculate_segment_stats(&segments_tsv, std::io::stdout().lock(), None)?;
             }
         },
         Commands::Predict { model } => match model {

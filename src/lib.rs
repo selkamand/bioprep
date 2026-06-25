@@ -1,10 +1,12 @@
 // pub mod breakend;
 pub mod config;
+pub mod constants;
 pub mod conversions;
 pub mod error;
 pub mod io;
 pub mod pubtypes;
 pub mod seqlibutils;
+pub mod stats;
 pub mod tally;
 pub mod tallytypes;
 pub mod vcfutils;

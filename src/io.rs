@@ -79,3 +79,27 @@ pub fn read_bedpe_tsv(bedpe_tsv: &Path) -> Result<csv::Reader<File>> {
             source: source.into(),
         })
 }
+
+pub fn read_copynumber_segements_purple(segments: &Path) -> Result<csv::Reader<File>> {
+    csv::ReaderBuilder::new()
+        .delimiter(b'\t')
+        .has_headers(true)
+        .comment(Some(b'#'))
+        .from_path(segments)
+        .map_err(|source| Error::ReadTsv {
+            path: segments.to_owned(),
+            source: source.into(),
+        })
+}
+
+pub fn read_idxstats_tsv(idxstats_tsv: &Path) -> Result<csv::Reader<File>> {
+    csv::ReaderBuilder::new()
+        .delimiter(b'\t')
+        .has_headers(false)
+        .comment(Some(b'#'))
+        .from_path(idxstats_tsv)
+        .map_err(|source| Error::ReadTsv {
+            path: idxstats_tsv.to_owned(),
+            source: source.into(),
+        })
+}

@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 /// A Small Variant (SNV / MNV / INDEL)
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone, PartialEq)]
 pub struct Mutation {
@@ -342,4 +344,78 @@ impl std::fmt::Display for Strand {
 //     Paired,
 //     PairedWithMateMissing,
 //     Single,
-// }
+
+/// A segment file describing the somatic copynumber profile of all
+/// contiguous segments in a tumour
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CopynumberSegments {
+    #[serde(rename = "chromosome")]
+    pub chr: String,
+    pub start: u64,
+    pub end: u64,
+
+    /// Fitted absolute copy number of segment adjusted for purity and ploidy
+    #[serde(rename = "copyNumber")]
+    pub copy_number: f32,
+
+    /// Copy number of minor allele adjusted for purity
+    #[serde(rename = "minorAlleleCopyNumber")]
+    pub minor_allele_copy_number: f32,
+    /// Copy number of major allele adjusted for purity
+    #[serde(rename = "majorAlleleCopyNumber")]
+    pub major_allele_copy_number: f32,
+}
+
+impl CopynumberSegments {
+    pub fn total_copynumber(&self) -> f32 {
+        self.minor_allele_copy_number + self.minor_allele_copy_number
+    }
+    pub fn total_copynumber_int(&self) -> u64 {
+        // TODO: make safe by checking?
+        (self.minor_allele_copy_number + self.minor_allele_copy_number).round() as u64
+    }
+    pub fn width(&self) -> u64 {
+        //TODO: check indexing
+        self.end - self.start
+    }
+
+    /// Classify segment as a Homozygous Deletion, A loss of heterozygosity event, or
+    /// heterozygous. This version of the function is based on the sigprofilermatrixgenerator
+    /// algorithm. Note here a complete homozygous deletion is when copyNumber < 1.
+    /// If total copynumber is 0.99, minor_allele_copy_number is 0, and major allele copynumber is
+    /// 0.99, it WILL get called homozygous del instead of LOH.
+    ///
+    /// This is similar but not identical to the sigminer implementation where LOH = total copynumber >= 1
+    /// and minor copynumber == 0. If you have a total copynumber of 1, and a minor copy number of 0.05 sigminer
+    /// will not call it LOH but sigprofiler will.
+    pub fn segment_class(&self) -> SegmentClass {
+        // If total copynumber is close to zero, mark as a HomozygousDeletion
+        if self.copy_number < 1_f32 {
+            SegmentClass::HomozygousDeletion
+        }
+        // If total copynumber is non-zero but minor_allele_copy_number is
+        // close to zero, mark as a loss of heterozygosity event
+        else if self.minor_allele_copy_number < 1_f32 || self.major_allele_copy_number < 1_f32 {
+            SegmentClass::LossOfHeterozygosity
+        }
+        // Otherwise assume heterozygous
+        else {
+            SegmentClass::Heterozygous
+        }
+    }
+}
+
+pub enum SegmentClass {
+    HomozygousDeletion,
+    LossOfHeterozygosity,
+    Heterozygous,
+}
+
+// Simple struct to contain single record types
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+pub struct Idxstats {
+    pub contig: String,
+    pub length: u64,
+    pub n_mapped: u64,
+    pub n_unmapped: u64,
+}
